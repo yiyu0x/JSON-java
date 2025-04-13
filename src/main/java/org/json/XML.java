@@ -1129,4 +1129,170 @@ public class XML {
         }
         return sb.toString();
     }
+
+    /**
+     * Convert a well-formed (but not necessarily valid) XML into a JSONObject
+     * and extract the sub-object specified by the JSONPointer path.
+     *
+     * @param reader The XML source reader.
+     * @param path The JSONPointer specifying the sub-object to extract.
+     * @return A JSONObject containing the sub-object specified by the path.
+     * @throws JSONException Thrown if there is an error parsing the string
+     *                       or if the path does not exist.
+     */
+    public static JSONObject toJSONObject(Reader reader, JSONPointer path) throws JSONException {
+        if (reader == null) {
+            throw new JSONException("Reader must not be null");
+        }
+        if (path == null) {
+            throw new NullPointerException("JSONPointer must not be null");
+        }
+
+        XMLTokener x = new XMLTokener(reader);
+        JSONObject root = new JSONObject();
+        String[] pathSegments = path.toString().split("/");
+
+        while (x.more()) {
+            x.skipPast("<");
+            if (x.more()) {
+                if (parseToPath(x, root, pathSegments, 0)) {
+                    Object result = root.query(path);
+                    if (result instanceof JSONObject) {
+                        return (JSONObject) result;
+                    } else {
+                        throw new JSONException("Path does not point to a JSONObject: " + path.toString());
+                    }
+                }
+            }
+        }
+
+        throw new JSONException("Path not found: " + path.toString());
+    }
+
+    /**
+     * Convert a well-formed (but not necessarily valid) XML into a JSONObject,
+     * replace the sub-object specified by the JSONPointer path with the provided
+     * replacement JSONObject, and return the modified JSONObject.
+     *
+     * @param reader The XML source reader.
+     * @param path The JSONPointer specifying the sub-object to replace.
+     * @param replacement The JSONObject to replace the sub-object with.
+     * @return A JSONObject containing the modified structure.
+     * @throws JSONException Thrown if there is an error parsing the string
+     *                       or if the path does not exist.
+     */
+    public static JSONObject toJSONObject(Reader reader, JSONPointer path, JSONObject replacement) throws JSONException {
+        if (reader == null) {
+            throw new JSONException("Reader must not be null");
+        }
+        if (path == null) {
+            throw new NullPointerException("JSONPointer must not be null");
+        }
+        if (replacement == null) {
+            throw new JSONException("Replacement JSONObject must not be null");
+        }
+
+        XMLTokener x = new XMLTokener(reader);
+        JSONObject root = new JSONObject();
+        String[] pathSegments = path.toString().split("/");
+
+        while (x.more()) {
+            x.skipPast("<");
+            if (x.more()) {
+                if (parseAndReplaceToPath(x, root, pathSegments, 0, replacement)) {
+                    return root;
+                }
+            }
+        }
+
+        throw new JSONException("Path not found: " + path.toString());
+    }
+
+    private static boolean parseToPath(XMLTokener x, JSONObject context, String[] pathSegments, int pathIndex) throws JSONException {
+        if (pathIndex >= pathSegments.length) {
+            return false;
+        }
+
+        String currentSegment = pathSegments[pathIndex];
+        String tagName;
+        Object token = x.nextToken();
+
+        if (token instanceof String) {
+            tagName = (String) token;
+            if (currentSegment.equals(tagName)) {
+                JSONObject child = new JSONObject();
+                context.put(tagName, child);
+                if (pathIndex == pathSegments.length - 1) {
+                    // Successfully reached the target path
+                    return true;
+                }
+                while (x.more()) {
+                    if (parseToPath(x, child, pathSegments, pathIndex + 1)) {
+                        return true;
+                    }
+                }
+            } else {
+                // Skip unrelated tags
+                x.skipPast("</" + tagName + ">");
+            }
+        } else if (token == XML.SLASH) {
+            // Handle self-closing tags
+            token = x.nextToken();
+            if (token instanceof String && currentSegment.equals(token)) {
+                if (pathIndex == pathSegments.length - 1) {
+                    context.put((String) token, new JSONObject());
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    private static boolean parseAndReplaceToPath(XMLTokener x, JSONObject context, String[] pathSegments, int pathIndex, JSONObject replacement) throws JSONException {
+        if (pathIndex >= pathSegments.length) {
+            return false;
+        }
+
+        String currentSegment = pathSegments[pathIndex];
+        String tagName;
+        Object token = x.nextToken();
+
+        if (token instanceof String) {
+            tagName = (String) token;
+            if (currentSegment.equals(tagName)) {
+                if (pathIndex == pathSegments.length - 1) {
+                    // Replace the sub-object at the specified path
+                    if (context.has(tagName) && context.get(tagName) instanceof JSONArray) {
+                        JSONArray array = context.getJSONArray(tagName);
+                        int index = Integer.parseInt(pathSegments[pathIndex + 1]);
+                        array.put(index, replacement);
+                    } else {
+                        context.put(tagName, replacement);
+                    }
+                    x.skipPast("</" + tagName + ">");
+                    return true;
+                }
+                JSONObject child = new JSONObject();
+                context.put(tagName, child);
+                while (x.more()) {
+                    if (parseAndReplaceToPath(x, child, pathSegments, pathIndex + 1, replacement)) {
+                        return true;
+                    }
+                }
+            } else {
+                // Skip unrelated tags
+                x.skipPast("</" + tagName + ">");
+            }
+        } else if (token == XML.SLASH) {
+            // Handle self-closing tags
+            token = x.nextToken();
+            if (token instanceof String && currentSegment.equals(token)) {
+                if (pathIndex == pathSegments.length - 1) {
+                    context.put((String) token, replacement);
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
 }
