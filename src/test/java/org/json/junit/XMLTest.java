@@ -27,6 +27,9 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
 
 /**
  * Tests for JSON-Java XML.java
@@ -1495,7 +1498,26 @@ public class XMLTest {
             assertTrue(e.getMessage().contains("JSONPointer must not be null"));
         }
     }
-}
 
+
+    @Test
+    public void toJSONObject2_extractionTest() {
+        String xml = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"+
+            "<contact>\n"+
+            "  <nick>Crista </nick>\n"+
+            "  <name>Crista Lopes</name>\n" +
+            "  <address>\n" +
+            "    <street>Ave of Nowhere</street>\n" +
+            "    <zipcode>92614</zipcode>\n" +
+            "  </address>\n" +
+            "</contact>";
+
+        JSONPointer pointer = new JSONPointer("/contact/address/street/");
+        JSONObject result = XML.toJSONObject2(new StringReader(xml), pointer);
+
+        assertNotNull(result);
+        assertEquals("Ave of Nowhere", result.getString("street"));
+    }
+}
 
 

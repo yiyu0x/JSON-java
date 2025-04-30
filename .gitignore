@@ -16,3 +16,4 @@ build
 /gradlew
 /gradlew.bat
 .gitmodules
+*.class

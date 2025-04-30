@@ -961,7 +961,7 @@ public class XML {
                         ja = (JSONArray) value;
                         int jaLength = ja.length();
                         // don't use the new iterator API to maintain support for Android
-						for (int i = 0; i < jaLength; i++) {
+                        for (int i = 0; i < jaLength; i++) {
                             if (i > 0) {
                                 sb.append('\n');
                             }
@@ -978,7 +978,7 @@ public class XML {
                     ja = (JSONArray) value;
                     int jaLength = ja.length();
                     // don't use the new iterator API to maintain support for Android
-					for (int i = 0; i < jaLength; i++) {
+                    for (int i = 0; i < jaLength; i++) {
                         Object val = ja.opt(i);
                         if (val instanceof JSONArray) {
                             sb.append('<');
@@ -1043,7 +1043,7 @@ public class XML {
             }
             int jaLength = ja.length();
             // don't use the new iterator API to maintain support for Android
-			for (int i = 0; i < jaLength; i++) {
+            for (int i = 0; i < jaLength; i++) {
                 Object val = ja.opt(i);
                 // XML does not have good support for arrays. If an array
                 // appears in a place where XML is lacking, synthesize an
@@ -1295,4 +1295,226 @@ public class XML {
         }
         return false;
     }
+
+
+    /**     =============================================== */
+// ...existing code...
+
+public static JSONObject toJSONObject2(Reader reader, JSONPointer path) throws JSONException {
+    if (reader == null) {
+        throw new JSONException("Reader must not be null");
+    }
+    if (path == null) {
+        throw new NullPointerException("JSONPointer must not be null");
+    }
+
+    // 將 JSONPointer 字串前後的斜線去除後再切割
+    String pathStr = path.toString();
+    if (pathStr.startsWith("/")) {
+        pathStr = pathStr.substring(1);
+    }
+    if (pathStr.endsWith("/")) {
+        pathStr = pathStr.substring(0, pathStr.length() - 1);
+    }
+    String[] segments = pathStr.split("/");
+
+    XMLTokener x = new XMLTokener(reader);
+    JSONObject result = new JSONObject();
+
+    // 跳過 XML 聲明
+    x.skipPast("?>");
+
+    // 使用 parseWithPath 進行局部解析
+    if (parseWithPath(x, result, segments, 0)) {
+        return result;
+    }
+    throw new JSONException("Path not found: " + path.toString());
+}
+
+// ...existing code...
+
+private static boolean parseWithPath(XMLTokener x, JSONObject context, String[] pathSegments, int pathIndex) throws JSONException {
+    // 1. 跳過非字串 token，直到抓到標籤名稱或 EOF
+    Object token = x.nextToken();
+    while (token != null && !(token instanceof String)) {
+        if (token instanceof Character) {
+            char c = (Character) token;
+            if (c == BANG || c == QUEST) {
+                x.skipPast(">");
+            }
+        }
+        token = x.nextToken();
+    }
+    if (token == null) {
+        return false;
+    }
+
+    // 2. 判定是否符合要找的標籤
+    String tagName = (String) token;
+    if (!tagName.equals(pathSegments[pathIndex])) {
+        // 若不符合，整段跳過即可
+        skipTag(x, tagName);
+        return false;
+    }
+
+    // 3. 若符合，建立 JSON 子物件
+    JSONObject child = new JSONObject();
+    context.put(tagName, child);
+
+    // 4. 消費可能的屬性，直到看見 '>' or '/>'
+    token = x.nextToken();
+    while (token != XML.GT && token != XML.SLASH) {
+        // 跳過所有字串（屬性名稱/值）及 '=' 符號
+        token = x.nextToken();
+    }
+
+    // 5. 處理自閉合標籤
+    if (token == XML.SLASH) {
+        if (x.nextToken() != XML.GT) {
+            throw new JSONException("Malformed self-closing tag for " + tagName);
+        }
+        return (pathIndex == pathSegments.length - 1);
+    }
+
+    // 6. 此時 token == '>', 進入內文或子標籤的處理
+    if (pathIndex == pathSegments.length - 1) {
+        // 若已經到最後一段，就消耗內容直到對應的 </tagName>
+        while (true) {
+            token = x.nextContent();
+            if (token == null) {
+                return false;
+            }
+            if (token == XML.LT) {
+                Object next = x.nextToken();
+                if (next == XML.SLASH) {
+                    // 檢查關閉標籤
+                    if (!tagName.equals(x.nextToken()) || x.nextToken() != XML.GT) {
+                        throw new JSONException("Malformed closing tag");
+                    }
+                    return true;
+                } else {
+                    // 不是目標標籤，一律跳過
+                    skipTag(x, (String) next);
+                    return false;
+                }
+            }
+        }
+    }
+
+    // 7. 尚未到達最後一段，繼續向下搜尋
+    while (true) {
+        token = x.nextContent();
+        if (token == null) {
+            return false;
+        }
+        if (token == XML.LT) {
+            Object next = x.nextToken();
+            if (next == XML.SLASH) {
+                // 關閉標籤
+                if (!tagName.equals(x.nextToken()) || x.nextToken() != XML.GT) {
+                    throw new JSONException("Malformed closing tag");
+                }
+                return false;
+            } else {
+                // 檢查是否符合下一段路徑
+                String childTag = (String) next;
+                if ((pathIndex + 1) < pathSegments.length && childTag.equals(pathSegments[pathIndex + 1])) {
+                    // 建立孫物件，並嘗試遞迴搜尋
+                    JSONObject grandChild = new JSONObject();
+                    child.put(childTag, grandChild);
+
+                    // 處理可能的屬性或自閉合
+                    token = x.nextToken();
+                    while (token != XML.GT && token != XML.SLASH) {
+                        token = x.nextToken();
+                    }
+                    if (token == XML.SLASH) {
+                        if (x.nextToken() != XML.GT) {
+                            throw new JSONException("Malformed self-closing tag for " + childTag);
+                        }
+                        if (pathIndex + 1 == pathSegments.length - 1) {
+                            return true;
+                        }
+                        continue;
+                    }
+                    // 走遞迴
+                    if (parseWithPath(x, grandChild, pathSegments, pathIndex + 1)) {
+                        return true;
+                    } else {
+                        skipTag(x, childTag);
+                    }
+                } else {
+                    // 路徑不符，跳過
+                    skipTag(x, childTag);
+                }
+            }
+        }
+    }
+}
+
+// ...existing code...
+private static void skipTag(XMLTokener x, String tagName) throws JSONException {
+    System.out.println("開始跳過標籤: " + tagName);
+    
+    // 1. 首先確保消耗屬性直到 > 或 />
+    Object token = x.nextToken();
+    while (token != GT && token != SLASH) {
+        token = x.nextToken();
+    }
+    
+    // 2. 處理自閉合標籤 <tag/>
+    if (token == SLASH) {
+        if (x.nextToken() != GT) {
+            throw new JSONException("Malformed self-closing tag for " + tagName);
+        }
+        System.out.println("跳過自閉合標籤: " + tagName);
+        return;
+    }
+    
+    // 3. 消耗內容直到完全匹配的閉合標籤 </tagName>
+    int depth = 1; // 標籤嵌套深度
+
+    // 關鍵調整：直接使用 skipPast 來更可靠地跳過整個標籤
+    try {
+        x.skipPast("</" + tagName + ">");
+    } catch (JSONException e) {
+        System.out.println("無法直接跳過，改用手動跳過: " + tagName);
+        
+        // 備用方案：手動跳過所有內容直到找到匹配的閉合標籤
+        while (depth > 0 && x.more()) {
+            token = x.nextContent();
+            if (token == null) {
+                break;
+            }
+            if (token == LT) {
+                token = x.nextToken();
+                if (token == SLASH) {
+                    String closingTag = (String) x.nextToken();
+                    if (closingTag.equals(tagName)) {
+                        depth--;
+                        x.nextToken(); // 消耗 '>'
+                    }
+                } else if (token instanceof String) {
+                    // 遇到新子標籤
+                    String subTag = (String) token;
+                    if (subTag.equals(tagName)) {
+                        depth++; // 相同標籤嵌套
+                    }
+                    
+                    // 消耗子標籤的屬性
+                    token = x.nextToken();
+                    while (token != GT && token != SLASH) {
+                        token = x.nextToken();
+                    }
+                    
+                    if (token == SLASH) {
+                        x.nextToken(); // 消耗自閉合標籤的 '>'
+                    }
+                }
+            }
+        }
+    }
+    
+    System.out.println("已跳過標籤: " + tagName);
+}
 }
