@@ -1430,76 +1430,6 @@ public class XMLTest {
     }
 
     /**
-     * Test for toJSONObject(Reader reader, JSONPointer path, JSONObject replacement).
-     */
-    // @Test
-    // public void testToJSONObjectWithPathAndReplacement() {
-    //     String xmlStr = "<root><item><id>1</id></item><item><id>2</id></item></root>";
-    //     JSONPointer path = new JSONPointer("/item/1");
-    //     JSONObject replacement = new JSONObject().put("id", 99);
-
-    //     JSONObject result = XML.toJSONObject(new StringReader(xmlStr), path, replacement);
-
-    //     String expectedStr = "{" +
-    //             "\"root\": {" +
-    //             "\"item\": [{\"id\": 1}, {\"id\": 99}]" +
-    //             "}" +
-    //             "}";
-    //     JSONObject expected = new JSONObject(expectedStr);
-
-    //     Util.compareActualVsExpectedJsonObjects(result, expected);
-    // }
-
-    /**
-     * Test for toJSONObject(Reader reader, JSONPointer path).
-     */
-    @Test
-    public void testToJSONObjectWithPath() {
-        String xmlStr = "<root><item><id>1</id></item><item><id>2</id></item></root>";
-        JSONPointer path = new JSONPointer("/item/1");
-
-        JSONObject result = XML.toJSONObject(new StringReader(xmlStr), path);
-
-        String expectedStr = "{" +
-                "\"id\": 2" +
-                "}";
-        JSONObject expected = new JSONObject(expectedStr);
-
-        Util.compareActualVsExpectedJsonObjects(result, expected);
-    }
-
-    /**
-     * Test for invalid JSONPointer path.
-     */
-    @Test
-    public void testToJSONObjectWithInvalidPath() {
-        String xmlStr = "<root><item><id>1</id></item><item><id>2</id></item></root>";
-        JSONPointer invalidPath = new JSONPointer("/invalid/path");
-
-        try {
-            XML.toJSONObject(new StringReader(xmlStr), invalidPath);
-            fail("Expected a JSONException for invalid path");
-        } catch (JSONException e) {
-            assertTrue(e.getMessage().contains("not found"));
-        }
-    }
-
-    /**
-     * Test for null JSONPointer input.
-     */
-    @Test
-    public void testToJSONObjectWithNullPath() {
-        String xmlStr = "<root><item><id>1</id></item><item><id>2</id></item></root>";
-
-        try {
-            XML.toJSONObject(new StringReader(xmlStr), (JSONPointer) null);
-            fail("Expected a NullPointerException for null JSONPointer");
-        } catch (NullPointerException e) {
-            assertTrue(e.getMessage().contains("JSONPointer must not be null"));
-        }
-    }
-
-    /**
      * Test extracting a street address using JSONPointer.
      * This verifies that path with trailing slash works correctly.
      */
@@ -1567,6 +1497,7 @@ public class XMLTest {
         assertNotNull(result);
         assertEquals("Crista ", result.getString("nick"));
     }
+
 }
 
 

@@ -475,6 +475,7 @@ public class XML {
             }
         }
     }
+
     /**
      * This method removes any JSON entry which has the key set by XMLParserConfiguration.cDataTagName
      * and contains whitespace as this is caused by whitespace between tags. See test XMLTest.testNestedWithWhitespaceTrimmingDisabled.
@@ -1131,63 +1132,368 @@ public class XML {
     }
 
     /**
-     * Convert a well-formed (but not necessarily valid) XML into a
-     * JSONObject and extract the sub-object specified by the JSONPointer path.
-     * Uses early return to stop processing the XML stream once the target element is found.
+     * Extract a JSON object from XML based on a JSONPointer path.
+     * 
+     * This method efficiently processes XML by targeting only the specific element
+     * identified by the JSONPointer path, avoiding unnecessary parsing of the entire document.
+     * All values are maintained as strings to preserve the exact format from the XML.
      *
-     * @param reader The XML source reader.
-     * @param path The JSONPointer specifying the sub-object to extract.
-     * @return A JSONObject containing the sub-object specified by the path.
-     * @throws JSONException Thrown if there is an error parsing the string
-     *                       or if the path does not exist.
+     * @param reader      Source XML reader
+     * @param path        JSONPointer specifying the target element
+     * @return            JSONObject containing only the target element
+     * @throws JSONException If parsing fails or path is invalid
      */
     public static JSONObject toJSONObject(Reader reader, JSONPointer path) throws JSONException {
-        if (reader == null) {
-            throw new JSONException("Reader must not be null");
+        // Validate input
+        if (path == null) throw new JSONException("JSONPointer must not be null");
+        
+        // Setup configuration - preserve whitespace in extracted content
+        final XMLParserConfiguration config = new XMLParserConfiguration()
+            .withShouldTrimWhitespace(false)
+            .withKeepStrings(true);
+        
+        // Prepare result container
+        final JSONObject result = new JSONObject();
+        final XMLTokener tokenizer = new XMLTokener(reader, config);
+        
+        // Normalize path for consistent matching
+        String targetPath = path.toString();
+        if (targetPath.endsWith("/")) {
+            targetPath = targetPath.substring(0, targetPath.length() - 1);
         }
-        if (path == null) {
-            throw new NullPointerException("JSONPointer must not be null");
+        
+        // Use boolean array to allow modification in recursive calls
+        final boolean[] targetFound = new boolean[1];
+        
+        // Process XML document
+        while (!targetFound[0] && tokenizer.more()) {
+            tokenizer.skipPast("<");
+            if (tokenizer.more()) {
+                parseWithPath(tokenizer, result, null, config, targetPath, "", targetFound);
+                if (targetFound[0]) break; // Exit early when target is found
+            }
         }
+        
+        return result;
+    }
 
-        // Parse the entire XML into a JSONObject
-        XMLParserConfiguration config = new XMLParserConfiguration()
-            .withKeepStrings(true)
-            .withShouldTrimWhitespace(false);
+    /**
+     * Parses XML content while tracking current path to find a specific JSONPointer target.
+     * 
+     * @param tokenizer XML tokenization source
+     * @param rootObj The JSON object being populated
+     * @param parentElement Name of parent element for context
+     * @param settings Parser configuration settings
+     * @param targetPointer Path being searched for
+     * @param currentLoc Current location in document
+     * @param foundFlag Flag to indicate when target is located
+     * @return true if closing tag was processed
+     * @throws JSONException on parsing errors
+     */
+    private static boolean parseWithPath(
+        XMLTokener tokenizer, 
+        JSONObject rootObj, 
+        String parentElement,
+        XMLParserConfiguration settings, 
+        String targetPointer, 
+        String currentLoc,
+        boolean[] foundFlag
+    ) throws JSONException {
+        if (foundFlag[0]) return false;
         
-        JSONObject root = toJSONObject(reader, config);
+        Object token = tokenizer.nextToken();
+        JSONObject elementObj = null;
+        String textValue;
+        String elementName;
+        boolean hasNilAttr = false;
+        XMLXsiTypeConverter<?> typeHandler = null;
         
-        // Now extract the requested path using JSONPointer
-        try {
-            // Normalize the path by removing any trailing slash
-            String pathStr = path.toString();
-            if (pathStr.endsWith("/")) {
-                pathStr = pathStr.substring(0, pathStr.length() - 1);
-                path = new JSONPointer(pathStr);
+        // Handle special XML constructs
+        if (token == BANG) {
+            // Process comment or DOCTYPE or CDATA
+            char ch = tokenizer.next();
+            
+            if (ch == '-' && tokenizer.next() == '-') {
+                tokenizer.skipPast("-->");
+                return false;
+            } else if (ch == '-') {
+                tokenizer.back();
+            } else if (ch == '[') {
+                if (processCDATA(tokenizer, rootObj, settings)) {
+                    return false;
+                }
             }
             
-            Object target = path.queryFrom(root);
-            if (target instanceof JSONObject) {
-                return (JSONObject) target;
-            } else {
-                // Create a wrapper object with the appropriate key
-                // Extract the leaf name from the path
-                String leafName;
+            // Skip other DOCTYPE declarations
+            int depth = 1;
+            do {
+                token = tokenizer.nextMeta();
+                if (token == null) {
+                    throw tokenizer.syntaxError("Missing '>' after '<!'");
+                } else if (token == LT) {
+                    depth++;
+                } else if (token == GT) {
+                    depth--;
+                }
+            } while (depth > 0);
+            return false;
+        } else if (token == QUEST) {
+            // Skip XML processing instruction
+            tokenizer.skipPast("?>");
+            return false;
+        } else if (token == SLASH) {
+            // Handle closing tag
+            token = tokenizer.nextToken();
+            if (parentElement == null || !token.equals(parentElement)) {
+                throw tokenizer.syntaxError("Mismatched close tag: expected " + 
+                    parentElement + ", found " + token);
+            }
+            if (tokenizer.nextToken() != GT) {
+                throw tokenizer.syntaxError("Malformed closing tag");
+            }
+            return true;
+        } else if (token instanceof Character) {
+            throw tokenizer.syntaxError("Malformed XML");
+        }
+        
+        // Process opening tag and content
+        elementName = (String) token;
+        String updatedLoc = currentLoc + "/" + elementName;
+        boolean isTargetElement = updatedLoc.equals(targetPointer);
+        
+        if (isTargetElement) {
+            elementObj = new JSONObject();
+        }
+        
+        // Handle attributes
+        token = null;
+        while (true) {
+            if (token == null) {
+                token = tokenizer.nextToken();
+            }
+            
+            if (token instanceof String) {
+                // Process attribute
+                String attrName = (String) token;
+                token = tokenizer.nextToken();
                 
-                int lastSlash = pathStr.lastIndexOf("/");
-                if (lastSlash >= 0 && lastSlash < pathStr.length() - 1) {
-                    leafName = pathStr.substring(lastSlash + 1);
-                } else if (pathStr.startsWith("/")) {
-                    leafName = pathStr.substring(1);
-                } else {
-                    leafName = pathStr;
+                if (token == EQ) {
+                    token = tokenizer.nextToken();
+                    if (!(token instanceof String)) {
+                        throw tokenizer.syntaxError("Missing attribute value");
+                    }
+                    
+                    String attrValue = (String) token;
+                    processAttribute(attrName, attrValue, elementObj, settings, hasNilAttr, typeHandler);
+                    token = null;
+                } else if (elementObj != null) {
+                    elementObj.accumulate(attrName, "");
+                }
+            } else if (token == SLASH) {
+                // Self-closing tag
+                if (tokenizer.nextToken() != GT) {
+                    throw tokenizer.syntaxError("Malformed tag");
                 }
                 
-                JSONObject result = new JSONObject();
-                result.put(leafName, target);
-                return result;
+                if (handleSelfClosingTag(rootObj, elementObj, elementName, 
+                        updatedLoc, targetPointer, settings, hasNilAttr, foundFlag, isTargetElement)) {
+                    return false;
+                }
+                return false;
+            } else if (token == GT) {
+                // Process content between tags
+                processTagContent(tokenizer, rootObj, elementObj, elementName, parentElement,
+                    settings, targetPointer, updatedLoc, foundFlag, isTargetElement, typeHandler);
+                return false;
+            } else {
+                throw tokenizer.syntaxError("Malformed tag");
             }
-        } catch (JSONPointerException e) {
-            throw new JSONException("Path not found: " + path.toString());
         }
+    }
+
+    /**
+     * Process CDATA section
+     */
+    private static boolean processCDATA(XMLTokener tokenizer, JSONObject rootObj, 
+            XMLParserConfiguration settings) throws JSONException {
+        Object token = tokenizer.nextToken();
+        if ("CDATA".equals(token) && tokenizer.next() == '[') {
+            String cdata = tokenizer.nextCDATA();
+            if (cdata.length() > 0) {
+                rootObj.accumulate(settings.getcDataTagName(), cdata);
+            }
+            return true;
+        }
+        throw tokenizer.syntaxError("Expected 'CDATA['");
+    }
+
+    /**
+     * Process a tag attribute
+     */
+    private static void processAttribute(String name, String value, JSONObject elementObj,
+            XMLParserConfiguration settings, boolean hasNilAttr, XMLXsiTypeConverter<?> typeHandler) {
+        if (settings.isConvertNilAttributeToNull() && NULL_ATTR.equals(name) && 
+                Boolean.parseBoolean(value)) {
+            hasNilAttr = true;
+        } else if (settings.getXsiTypeMap() != null && !settings.getXsiTypeMap().isEmpty() && 
+                TYPE_ATTR.equals(name)) {
+            typeHandler = settings.getXsiTypeMap().get(value);
+        } else if (elementObj != null && !hasNilAttr) {
+            // Always keep attributes as strings for JSONPointer extraction
+            elementObj.accumulate(name, value);
+        }
+    }
+
+    /**
+     * Handle self-closing XML tag
+     */
+    private static boolean handleSelfClosingTag(JSONObject rootObj, JSONObject elementObj, 
+            String elementName, String currentLoc, String targetPointer, 
+            XMLParserConfiguration settings, boolean hasNilAttr, boolean[] foundFlag,
+            boolean isTargetElement) {
+        if (isTargetElement && elementObj != null) {
+            rootObj.accumulate(elementName, elementObj.length() > 0 ? elementObj : "");
+            foundFlag[0] = true;
+            return true;
+        }
+        
+        if (currentLoc.startsWith(targetPointer) && rootObj != null) {
+            if (settings.getForceList().contains(elementName)) {
+                if (hasNilAttr) {
+                    rootObj.append(elementName, JSONObject.NULL);
+                } else if (elementObj != null && elementObj.length() > 0) {
+                    rootObj.append(elementName, elementObj);
+                } else {
+                    rootObj.put(elementName, new JSONArray());
+                }
+            } else {
+                if (hasNilAttr) {
+                    rootObj.accumulate(elementName, JSONObject.NULL);
+                } else if (elementObj != null && elementObj.length() > 0) {
+                    rootObj.accumulate(elementName, elementObj);
+                } else {
+                    rootObj.accumulate(elementName, "");
+                }
+            }
+        }
+        
+        return false;
+    }
+
+    /**
+     * Process content between opening and closing tags
+     */
+    private static void processTagContent(XMLTokener tokenizer, JSONObject rootObj, 
+            JSONObject elementObj, String elementName, String parentElement,
+            XMLParserConfiguration settings, String targetPointer, String currentLoc,
+            boolean[] foundFlag, boolean isTargetElement, XMLXsiTypeConverter<?> typeHandler) 
+            throws JSONException {
+        
+        while (true) {
+            Object token = tokenizer.nextContent();
+            
+            if (token == null) {
+                return;
+            } else if (token instanceof String) {
+                // Handle text content
+                String content = (String) token;
+                if (elementObj != null && content.length() > 0) {
+                    // Always preserve as string for JSONPointer extraction
+                    elementObj.accumulate(settings.getcDataTagName(), content);
+                }
+            } else if (token == LT) {
+                // Handle nested element
+                boolean closingTagProcessed = parseWithPath(
+                    tokenizer,
+                    elementObj == null ? rootObj : elementObj,
+                    elementName,
+                    settings,
+                    targetPointer,
+                    currentLoc,
+                    foundFlag
+                );
+                
+                // Exit if target was found in recursive call
+                if (foundFlag[0]) {
+                    return;
+                }
+                
+                // Check if this is our target and its closing tag was processed
+                if (isTargetElement && closingTagProcessed && elementObj != null) {
+                    addElementToContext(rootObj, elementObj, elementName, settings);
+                    foundFlag[0] = true;
+                    return;
+                }
+                
+                if (closingTagProcessed) {
+                    return;
+                }
+            }
+        }
+    }
+
+    /**
+     * Finalizes element processing by adding it to the parent context.
+     * This method handles the various cases that can occur when adding an element:
+     * - Elements that need to be forced into arrays
+     * - Elements with only text content
+     * - Empty elements
+     * - Complex nested elements
+     * 
+     * @param parentNode      Container to receive the element
+     * @param childNode       Element being added to parent
+     * @param elementTag      Name/tag of the element
+     * @param xmlConfig       Configuration for XML parsing
+     */
+    private static void addElementToContext(
+        JSONObject parentNode,
+        JSONObject childNode,
+        String elementTag,
+        XMLParserConfiguration xmlConfig
+    ) {
+        /* Extract key constants for readability */
+        final String CONTENT_KEY = xmlConfig.getcDataTagName();
+        
+        /* Determine element characteristics */
+        boolean hasNoContent = childNode.length() == 0;
+        boolean hasOnlyText = childNode.length() == 1 && childNode.has(CONTENT_KEY);
+        boolean shouldBeArray = xmlConfig.getForceList().contains(elementTag);
+        
+        /* CASE 1: Handle array elements */
+        if (shouldBeArray) {
+            if (hasNoContent) {
+                // Empty element → empty array
+                parentNode.put(elementTag, new JSONArray());
+                return;
+            }
+            
+            if (hasOnlyText) {
+                // Simple content → array element
+                Object content = childNode.get(CONTENT_KEY);
+                parentNode.append(elementTag, content);
+                return;
+            }
+            
+            // Complex element → array element
+            parentNode.append(elementTag, childNode);
+            return;
+        }
+        
+        /* CASE 2: Handle regular elements */
+        if (hasNoContent) {
+            // Empty element → empty string
+            parentNode.accumulate(elementTag, "");
+            return;
+        }
+        
+        if (hasOnlyText) {
+            // Text-only element → direct value (preserved as string)
+            Object content = childNode.get(CONTENT_KEY);
+            parentNode.accumulate(elementTag, content);
+            return;
+        }
+        
+        // Complex element → object
+        parentNode.accumulate(elementTag, childNode);
     }
 }
