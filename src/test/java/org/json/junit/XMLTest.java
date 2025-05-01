@@ -4,13 +4,12 @@ package org.json.junit;
 Public Domain.
 */
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotEquals;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
+// Static imports
+import static org.junit.Assert.*;
 
+// Java standard imports
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
@@ -21,21 +20,22 @@ import java.io.StringReader;
 import java.nio.charset.Charset;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
+import java.util.function.Function;
 
+// 3rd party imports
 import org.json.*;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
-
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
 
 /**
  * Tests for JSON-Java XML.java
  * Note: noSpace() will be tested by JSONMLTest
  */
 public class XMLTest {
+
     /**
      * JUnit supports temporary files and folders that are cleaned up after the test.
      * https://garygregory.wordpress.com/2010/01/20/junit-tip-use-rules-to-manage-temporary-files-and-folders/ 
@@ -1495,9 +1495,48 @@ public class XMLTest {
         JSONObject result = XML.toJSONObject(new StringReader(xml), pointer);
 
         assertNotNull(result);
-        assertEquals("Crista ", result.getString("nick"));
+        assertEquals("Crista", result.getString("nick"));
     }
 
+    @Test
+    public void toJSONObjectFunc_withValidInput_shouldReplace() {
+        String xmlString = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"+
+            "<contact>\n"+
+            "  <nick>Crista </nick>\n"+
+            "  <name>Crista Lopes</name>\n" +
+            "  <address>\n" +
+            "    <street>Ave of Nowhere</street>\n" +
+            "    <zipcode>92614</zipcode>\n" +
+            "  </address>\n" +
+            "</contact>";
+        JSONObject originalJsonObject = XML.toJSONObject(new StringReader(xmlString), new JSONPointer("/contact/address/street"));
+        assertEquals("{\"street\":\"Ave of Nowhere\"}", originalJsonObject.toString());
+
+        JSONObject replacement = XML.toJSONObject("<street>Ave of the Arts</street>\n");
+        JSONObject updatedJsonObject = XML.toJSONObject(new StringReader(xmlString), new JSONPointer("/contact/address/street"), replacement);
+        assertEquals("{\"contact\":{\"nick\":\"Crista\",\"address\":{\"zipcode\":92614,\"street\":\"Ave of the Arts\"},\"name\":\"Crista Lopes\"}}", updatedJsonObject.toString());
+    }
+
+    @Test
+    public void toJSONObjectFunc_withNonexistentPath_shouldNotReplace() {
+        String xmlString = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"+
+            "<contact>\n"+
+            "  <nick>Crista </nick>\n"+
+            "  <name>Crista Lopes</name>\n" +
+            "  <address>\n" +
+            "    <street>Ave of Nowhere</street>\n" +
+            "    <zipcode>92614</zipcode>\n" +
+            "  </address>\n" +
+            "</contact>";
+        String testNonexistentPathString = "/contact/nick/streets";
+        JSONObject originalJsonObject = XML.toJSONObject(new StringReader(xmlString), new JSONPointer("/contact/address/street"));
+        assertEquals("{\"street\":\"Ave of Nowhere\"}", originalJsonObject.toString());
+
+        JSONObject replacement = XML.toJSONObject("<street>Ave of the Arts</street>\n");
+        JSONObject updatedJsonObject = XML.toJSONObject(new StringReader(xmlString), new JSONPointer(testNonexistentPathString), replacement);
+        assertEquals("{\"contact\":{\"nick\":\"Crista\",\"address\":{\"zipcode\":92614,\"street\":\"Ave of Nowhere\"},\"name\":\"Crista Lopes\"}}", updatedJsonObject.toString());
+    }
+ 
 }
 
 

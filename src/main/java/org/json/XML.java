@@ -1149,12 +1149,11 @@ public class XML {
         
         // Setup configuration - preserve whitespace in extracted content
         final XMLParserConfiguration config = new XMLParserConfiguration()
-            .withShouldTrimWhitespace(false)
             .withKeepStrings(true);
         
         // Prepare result container
         final JSONObject result = new JSONObject();
-        final XMLTokener tokenizer = new XMLTokener(reader, config);
+        final XMLTokener tokenizer = new XMLTokener(reader);
         
         // Normalize path for consistent matching
         String targetPath = path.toString();
@@ -1495,5 +1494,207 @@ public class XML {
         
         // Complex element → object
         parentNode.accumulate(elementTag, childNode);
+    }
+
+    public static JSONObject toJSONObject(Reader reader, JSONPointer path, JSONObject replacement) {
+        if (reader == null || path == null || replacement == null) {
+            throw new IllegalArgumentException("reader, path, and replacement must not be null");
+        }
+        JSONObject result = new JSONObject();
+        XMLTokener tokener = new XMLTokener(reader);
+        String pointer = path.toString();
+        while (tokener.more()) {
+            tokener.skipPast("<");
+            if (tokener.more()) {
+                parseReplace(tokener, result, null, XMLParserConfiguration.ORIGINAL, pointer, "", replacement);
+            }
+        }
+        return result;
+    }
+
+    private static boolean parseReplace(XMLTokener x, JSONObject context, String name, XMLParserConfiguration config, String targetPath, String currentPath, JSONObject replacement) throws JSONException {
+        Object token = x.nextToken();
+        if (token == BANG) {
+            return handleBang(x, context, config);
+        } else if (token == QUEST) {
+            x.skipPast("?>");
+            return false;
+        } else if (token == SLASH) {
+            return handleCloseTag(x, name);
+        } else if (token instanceof Character) {
+            throw x.syntaxError("Misshaped tag");
+        } else {
+            String tagName = (String) token;
+            String pathNow = currentPath + "/" + tagName;
+            JSONObject jsonObject = pathNow.equals(targetPath) ? replacement : new JSONObject();
+            boolean nilAttributeFound = false;
+            XMLXsiTypeConverter<?> xmlXsiTypeConverter = null;
+            token = null;
+            while (true) {
+                if (token == null) token = x.nextToken();
+                if (token instanceof String) {
+                    AttributeResult attrResult = handleAttribute(x, config, jsonObject, (String) token, nilAttributeFound, xmlXsiTypeConverter);
+                    nilAttributeFound = attrResult.nilAttributeFound;
+                    xmlXsiTypeConverter = attrResult.xmlXsiTypeConverter;
+                    token = attrResult.nextToken;
+                } else if (token == SLASH) {
+                    return handleSelfClosingTag(x, context, config, tagName, jsonObject, nilAttributeFound);
+                } else if (token == GT) {
+                    return handleContent(x, context, config, tagName, jsonObject, nilAttributeFound, xmlXsiTypeConverter, targetPath, pathNow, replacement);
+                } else {
+                    throw x.syntaxError("Misshaped tag");
+                }
+            }
+        }
+    }
+
+    private static class AttributeResult {
+        boolean nilAttributeFound;
+        XMLXsiTypeConverter<?> xmlXsiTypeConverter;
+        Object nextToken;
+        AttributeResult(boolean nil, XMLXsiTypeConverter<?> conv, Object next) {
+            this.nilAttributeFound = nil;
+            this.xmlXsiTypeConverter = conv;
+            this.nextToken = next;
+        }
+    }
+
+    private static AttributeResult handleAttribute(XMLTokener x, XMLParserConfiguration config, JSONObject jsonObject, String key, boolean nilAttributeFound, XMLXsiTypeConverter<?> xmlXsiTypeConverter) throws JSONException {
+        Object token = x.nextToken();
+        if (token == EQ) {
+            token = x.nextToken();
+            if (!(token instanceof String)) {
+                throw x.syntaxError("Missing value");
+            }
+            if (config.isConvertNilAttributeToNull() && NULL_ATTR.equals(key) && Boolean.parseBoolean((String) token)) {
+                nilAttributeFound = true;
+            } else if (config.getXsiTypeMap() != null && !config.getXsiTypeMap().isEmpty() && TYPE_ATTR.equals(key)) {
+                xmlXsiTypeConverter = config.getXsiTypeMap().get(token);
+            } else if (!nilAttributeFound) {
+                jsonObject.accumulate(key, config.isKeepStrings() ? ((String) token) : stringToValue((String) token));
+            }
+            return new AttributeResult(nilAttributeFound, xmlXsiTypeConverter, null);
+        } else {
+            jsonObject.accumulate(key, "");
+            return new AttributeResult(nilAttributeFound, xmlXsiTypeConverter, token);
+        }
+    }
+
+    private static boolean handleBang(XMLTokener x, JSONObject context, XMLParserConfiguration config) throws JSONException {
+        char c = x.next();
+        Object token;
+        if (c == '-') {
+            if (x.next() == '-') {
+                x.skipPast("-->");
+                return false;
+            }
+            x.back();
+        } else if (c == '[') {
+            token = x.nextToken();
+            if ("CDATA".equals(token)) {
+                if (x.next() == '[') {
+                    String string = x.nextCDATA();
+                    if (!string.isEmpty()) {
+                        context.accumulate(config.getcDataTagName(), string);
+                    }
+                    return false;
+                }
+            }
+            throw x.syntaxError("Expected 'CDATA['");
+        }
+        int i = 1;
+        do {
+            token = x.nextMeta();
+            if (token == null) {
+                throw x.syntaxError("Missing '>' after '<!'.");
+            } else if (token == LT) {
+                i++;
+            } else if (token == GT) {
+                i--;
+            }
+        } while (i > 0);
+        return false;
+    }
+
+    private static boolean handleCloseTag(XMLTokener x, String name) throws JSONException {
+        Object token = x.nextToken();
+        if (name == null || !token.equals(name)) {
+            throw x.syntaxError("Mismatched close tag " + token);
+        }
+        if (x.nextToken() != GT) {
+            throw x.syntaxError("Misshaped close tag");
+        }
+        return true;
+    }
+
+    private static boolean handleSelfClosingTag(XMLTokener x, JSONObject context, XMLParserConfiguration config, String tagName, JSONObject jsonObject, boolean nilAttributeFound) throws JSONException {
+        if (x.nextToken() != GT) {
+            throw x.syntaxError("Misshaped tag");
+        }
+        if (context == null) return false;
+        if (config.getForceList().contains(tagName)) {
+            if (nilAttributeFound) {
+                context.append(tagName, JSONObject.NULL);
+            } else if (jsonObject.length() > 0) {
+                context.append(tagName, jsonObject);
+            } else {
+                context.put(tagName, new JSONArray());
+            }
+        } else {
+            if (nilAttributeFound) {
+                context.accumulate(tagName, JSONObject.NULL);
+            } else if (jsonObject.length() > 0) {
+                context.accumulate(tagName, jsonObject);
+            } else {
+                context.accumulate(tagName, "");
+            }
+        }
+        return false;
+    }
+
+    private static boolean handleContent(XMLTokener x, JSONObject context, XMLParserConfiguration config, String tagName, JSONObject jsonObject, boolean nilAttributeFound, XMLXsiTypeConverter<?> xmlXsiTypeConverter, String targetPath, String pathNow, JSONObject replacement) throws JSONException {
+        while (true) {
+            Object token = x.nextContent();
+            if (token == null) {
+                if (tagName != null) {
+                    throw x.syntaxError("Unclosed tag " + tagName);
+                }
+                return false;
+            } else if (token instanceof String) {
+                String string = (String) token;
+                if (!string.isEmpty()) {
+                    if (xmlXsiTypeConverter != null) {
+                        jsonObject.accumulate(config.getcDataTagName(), stringToValue(string, xmlXsiTypeConverter));
+                    } else {
+                        jsonObject.accumulate(config.getcDataTagName(), config.isKeepStrings() ? string : stringToValue(string));
+                    }
+                }
+            } else if (token == LT) {
+                boolean rec = !pathNow.equals(targetPath) && parseReplace(x, jsonObject, tagName, config, targetPath, pathNow, replacement);
+                if (rec || pathNow.equals(targetPath)) {
+                    if (config.getForceList().contains(tagName)) {
+                        if (jsonObject.length() == 0) {
+                            context.put(tagName, new JSONArray());
+                        } else if (jsonObject.length() == 1 && jsonObject.opt(config.getcDataTagName()) != null) {
+                            context.append(tagName, jsonObject.opt(config.getcDataTagName()));
+                        } else {
+                            context.append(tagName, jsonObject);
+                        }
+                    } else {
+                        if (jsonObject.length() == 0) {
+                            context.accumulate(tagName, "");
+                        } else if (jsonObject.length() == 1 && jsonObject.opt(config.getcDataTagName()) != null) {
+                            context.accumulate(tagName, jsonObject.opt(config.getcDataTagName()));
+                        } else if (pathNow.equals(targetPath)) {
+                            context.accumulate(tagName, replacement.get(tagName));
+                            x.skipPast("/" + tagName + ">");
+                        } else {
+                            context.accumulate(tagName, jsonObject);
+                        }
+                    }
+                    return false;
+                }
+            }
+        }
     }
 }
