@@ -6,12 +6,7 @@ In Milestone 2, we enhanced the `XML` class to support key transformation during
 ## Changes to Production Code (XML.java)
 
 ### Added New Methods
-Added three new overloaded methods to the XML class:
-
-```java
-static JSONObject toJSONObject(Reader reader, Function<String, String> keyTransformer)
-```
-This method allows XML parsing with key transformation. The `keyTransformer` is a function that takes a String key and returns a transformed String key, enabling dynamic transformation of XML element and attribute names during parsing.
+Added two new overloaded methods to the XML 
 
 ```java
 static JSONObject toJSONObject(Reader reader, JSONPointer path)
