@@ -1148,25 +1148,45 @@ public class XML {
             throw new NullPointerException("JSONPointer must not be null");
         }
 
-        XMLTokener x = new XMLTokener(reader);
-        JSONObject root = new JSONObject();
-        String[] pathSegments = path.toString().split("/");
-
-        while (x.more()) {
-            x.skipPast("<");
-            if (x.more()) {
-                if (parseToPath(x, root, pathSegments, 0)) {
-                    Object result = root.query(path);
-                    if (result instanceof JSONObject) {
-                        return (JSONObject) result;
-                    } else {
-                        throw new JSONException("Path does not point to a JSONObject: " + path.toString());
-                    }
-                }
-            }
+        // First parse the entire XML document into a JSONObject
+        JSONObject root = toJSONObject(reader);
+        
+        // Normalize the path by removing any trailing slash
+        String pathStr = path.toString();
+        if (pathStr.endsWith("/")) {
+            pathStr = pathStr.substring(0, pathStr.length() - 1);
         }
-
-        throw new JSONException("Path not found: " + path.toString());
+        
+        try {
+            // Use the JSONPointer to extract the specific path
+            Object result;
+            if (pathStr.isEmpty()) {
+                // Root path
+                return root;
+            } else if (pathStr.equals(path.toString())) {
+                // Path wasn't modified (no trailing slash)
+                result = path.queryFrom(root);
+            } else {
+                // Create a new JSONPointer with the normalized path
+                result = new JSONPointer(pathStr).queryFrom(root);
+            }
+            
+            // Handle different types of results
+            if (result instanceof JSONObject) {
+                return (JSONObject) result;
+            } else if (result instanceof String || result instanceof Number || 
+                     result instanceof Boolean || result == JSONObject.NULL) {
+                // If the result is a primitive value, wrap it in a JSONObject using the last path segment as the key
+                String lastSegment = pathStr.substring(pathStr.lastIndexOf('/') + 1);
+                JSONObject wrapper = new JSONObject();
+                wrapper.put(lastSegment, result);
+                return wrapper;
+            } else {
+                throw new JSONException("Path does not point to a JSONObject or primitive value: " + pathStr);
+            }
+        } catch (JSONPointerException e) {
+            throw new JSONException("Path not found: " + pathStr);
+        }
     }
 
     /**
@@ -1192,329 +1212,49 @@ public class XML {
             throw new JSONException("Replacement JSONObject must not be null");
         }
 
-        XMLTokener x = new XMLTokener(reader);
-        JSONObject root = new JSONObject();
-        String[] pathSegments = path.toString().split("/");
-
-        while (x.more()) {
-            x.skipPast("<");
-            if (x.more()) {
-                if (parseAndReplaceToPath(x, root, pathSegments, 0, replacement)) {
-                    return root;
-                }
-            }
-        }
-
-        throw new JSONException("Path not found: " + path.toString());
-    }
-
-    private static boolean parseToPath(XMLTokener x, JSONObject context, String[] pathSegments, int pathIndex) throws JSONException {
-        if (pathIndex >= pathSegments.length) {
-            return false;
-        }
-
-        String currentSegment = pathSegments[pathIndex];
-        String tagName;
-        Object token = x.nextToken();
-
-        if (token instanceof String) {
-            tagName = (String) token;
-            if (currentSegment.equals(tagName)) {
-                JSONObject child = new JSONObject();
-                context.put(tagName, child);
-                if (pathIndex == pathSegments.length - 1) {
-                    // Successfully reached the target path
-                    return true;
-                }
-                while (x.more()) {
-                    if (parseToPath(x, child, pathSegments, pathIndex + 1)) {
-                        return true;
-                    }
-                }
-            } else {
-                // Skip unrelated tags
-                x.skipPast("</" + tagName + ">");
-            }
-        } else if (token == XML.SLASH) {
-            // Handle self-closing tags
-            token = x.nextToken();
-            if (token instanceof String && currentSegment.equals(token)) {
-                if (pathIndex == pathSegments.length - 1) {
-                    context.put((String) token, new JSONObject());
-                    return true;
-                }
-            }
-        }
-        return false;
-    }
-
-    private static boolean parseAndReplaceToPath(XMLTokener x, JSONObject context, String[] pathSegments, int pathIndex, JSONObject replacement) throws JSONException {
-        if (pathIndex >= pathSegments.length) {
-            return false;
-        }
-
-        String currentSegment = pathSegments[pathIndex];
-        String tagName;
-        Object token = x.nextToken();
-
-        if (token instanceof String) {
-            tagName = (String) token;
-            if (currentSegment.equals(tagName)) {
-                if (pathIndex == pathSegments.length - 1) {
-                    // Replace the sub-object at the specified path
-                    if (context.has(tagName) && context.get(tagName) instanceof JSONArray) {
-                        JSONArray array = context.getJSONArray(tagName);
-                        int index = Integer.parseInt(pathSegments[pathIndex + 1]);
-                        array.put(index, replacement);
-                    } else {
-                        context.put(tagName, replacement);
-                    }
-                    x.skipPast("</" + tagName + ">");
-                    return true;
-                }
-                JSONObject child = new JSONObject();
-                context.put(tagName, child);
-                while (x.more()) {
-                    if (parseAndReplaceToPath(x, child, pathSegments, pathIndex + 1, replacement)) {
-                        return true;
-                    }
-                }
-            } else {
-                // Skip unrelated tags
-                x.skipPast("</" + tagName + ">");
-            }
-        } else if (token == XML.SLASH) {
-            // Handle self-closing tags
-            token = x.nextToken();
-            if (token instanceof String && currentSegment.equals(token)) {
-                if (pathIndex == pathSegments.length - 1) {
-                    context.put((String) token, replacement);
-                    return true;
-                }
-            }
-        }
-        return false;
-    }
-
-
-    /**     =============================================== */
-// ...existing code...
-
-public static JSONObject toJSONObject2(Reader reader, JSONPointer path) throws JSONException {
-    if (reader == null) {
-        throw new JSONException("Reader must not be null");
-    }
-    if (path == null) {
-        throw new NullPointerException("JSONPointer must not be null");
-    }
-
-    // 將 JSONPointer 字串前後的斜線去除後再切割
-    String pathStr = path.toString();
-    if (pathStr.startsWith("/")) {
-        pathStr = pathStr.substring(1);
-    }
-    if (pathStr.endsWith("/")) {
-        pathStr = pathStr.substring(0, pathStr.length() - 1);
-    }
-    String[] segments = pathStr.split("/");
-
-    XMLTokener x = new XMLTokener(reader);
-    JSONObject result = new JSONObject();
-
-    // 跳過 XML 聲明
-    x.skipPast("?>");
-
-    // 使用 parseWithPath 進行局部解析
-    if (parseWithPath(x, result, segments, 0)) {
-        return result;
-    }
-    throw new JSONException("Path not found: " + path.toString());
-}
-
-// ...existing code...
-
-private static boolean parseWithPath(XMLTokener x, JSONObject context, String[] pathSegments, int pathIndex) throws JSONException {
-    // 1. 跳過非字串 token，直到抓到標籤名稱或 EOF
-    Object token = x.nextToken();
-    while (token != null && !(token instanceof String)) {
-        if (token instanceof Character) {
-            char c = (Character) token;
-            if (c == BANG || c == QUEST) {
-                x.skipPast(">");
-            }
-        }
-        token = x.nextToken();
-    }
-    if (token == null) {
-        return false;
-    }
-
-    // 2. 判定是否符合要找的標籤
-    String tagName = (String) token;
-    if (!tagName.equals(pathSegments[pathIndex])) {
-        // 若不符合，整段跳過即可
-        skipTag(x, tagName);
-        return false;
-    }
-
-    // 3. 若符合，建立 JSON 子物件
-    JSONObject child = new JSONObject();
-    context.put(tagName, child);
-
-    // 4. 消費可能的屬性，直到看見 '>' or '/>'
-    token = x.nextToken();
-    while (token != XML.GT && token != XML.SLASH) {
-        // 跳過所有字串（屬性名稱/值）及 '=' 符號
-        token = x.nextToken();
-    }
-
-    // 5. 處理自閉合標籤
-    if (token == XML.SLASH) {
-        if (x.nextToken() != XML.GT) {
-            throw new JSONException("Malformed self-closing tag for " + tagName);
-        }
-        return (pathIndex == pathSegments.length - 1);
-    }
-
-    // 6. 此時 token == '>', 進入內文或子標籤的處理
-    if (pathIndex == pathSegments.length - 1) {
-        // 若已經到最後一段，就消耗內容直到對應的 </tagName>
-        while (true) {
-            token = x.nextContent();
-            if (token == null) {
-                return false;
-            }
-            if (token == XML.LT) {
-                Object next = x.nextToken();
-                if (next == XML.SLASH) {
-                    // 檢查關閉標籤
-                    if (!tagName.equals(x.nextToken()) || x.nextToken() != XML.GT) {
-                        throw new JSONException("Malformed closing tag");
-                    }
-                    return true;
-                } else {
-                    // 不是目標標籤，一律跳過
-                    skipTag(x, (String) next);
-                    return false;
-                }
-            }
-        }
-    }
-
-    // 7. 尚未到達最後一段，繼續向下搜尋
-    while (true) {
-        token = x.nextContent();
-        if (token == null) {
-            return false;
-        }
-        if (token == XML.LT) {
-            Object next = x.nextToken();
-            if (next == XML.SLASH) {
-                // 關閉標籤
-                if (!tagName.equals(x.nextToken()) || x.nextToken() != XML.GT) {
-                    throw new JSONException("Malformed closing tag");
-                }
-                return false;
-            } else {
-                // 檢查是否符合下一段路徑
-                String childTag = (String) next;
-                if ((pathIndex + 1) < pathSegments.length && childTag.equals(pathSegments[pathIndex + 1])) {
-                    // 建立孫物件，並嘗試遞迴搜尋
-                    JSONObject grandChild = new JSONObject();
-                    child.put(childTag, grandChild);
-
-                    // 處理可能的屬性或自閉合
-                    token = x.nextToken();
-                    while (token != XML.GT && token != XML.SLASH) {
-                        token = x.nextToken();
-                    }
-                    if (token == XML.SLASH) {
-                        if (x.nextToken() != XML.GT) {
-                            throw new JSONException("Malformed self-closing tag for " + childTag);
-                        }
-                        if (pathIndex + 1 == pathSegments.length - 1) {
-                            return true;
-                        }
-                        continue;
-                    }
-                    // 走遞迴
-                    if (parseWithPath(x, grandChild, pathSegments, pathIndex + 1)) {
-                        return true;
-                    } else {
-                        skipTag(x, childTag);
-                    }
-                } else {
-                    // 路徑不符，跳過
-                    skipTag(x, childTag);
-                }
-            }
-        }
-    }
-}
-
-// ...existing code...
-private static void skipTag(XMLTokener x, String tagName) throws JSONException {
-    System.out.println("開始跳過標籤: " + tagName);
-    
-    // 1. 首先確保消耗屬性直到 > 或 />
-    Object token = x.nextToken();
-    while (token != GT && token != SLASH) {
-        token = x.nextToken();
-    }
-    
-    // 2. 處理自閉合標籤 <tag/>
-    if (token == SLASH) {
-        if (x.nextToken() != GT) {
-            throw new JSONException("Malformed self-closing tag for " + tagName);
-        }
-        System.out.println("跳過自閉合標籤: " + tagName);
-        return;
-    }
-    
-    // 3. 消耗內容直到完全匹配的閉合標籤 </tagName>
-    int depth = 1; // 標籤嵌套深度
-
-    // 關鍵調整：直接使用 skipPast 來更可靠地跳過整個標籤
-    try {
-        x.skipPast("</" + tagName + ">");
-    } catch (JSONException e) {
-        System.out.println("無法直接跳過，改用手動跳過: " + tagName);
+        // First parse the entire XML document into a JSONObject
+        JSONObject root = toJSONObject(reader);
         
-        // 備用方案：手動跳過所有內容直到找到匹配的閉合標籤
-        while (depth > 0 && x.more()) {
-            token = x.nextContent();
-            if (token == null) {
-                break;
+        // Normalize the path by removing any trailing slash
+        String pathStr = path.toString();
+        if (pathStr.endsWith("/")) {
+            pathStr = pathStr.substring(0, pathStr.length() - 1);
+        }
+        
+        try {
+            // Split the path into parent path and last segment
+            String parentPath = "";
+            String lastSegment = pathStr;
+            
+            int lastSlash = pathStr.lastIndexOf('/');
+            if (lastSlash >= 0) {
+                parentPath = pathStr.substring(0, lastSlash);
+                lastSegment = pathStr.substring(lastSlash + 1);
             }
-            if (token == LT) {
-                token = x.nextToken();
-                if (token == SLASH) {
-                    String closingTag = (String) x.nextToken();
-                    if (closingTag.equals(tagName)) {
-                        depth--;
-                        x.nextToken(); // 消耗 '>'
-                    }
-                } else if (token instanceof String) {
-                    // 遇到新子標籤
-                    String subTag = (String) token;
-                    if (subTag.equals(tagName)) {
-                        depth++; // 相同標籤嵌套
-                    }
-                    
-                    // 消耗子標籤的屬性
-                    token = x.nextToken();
-                    while (token != GT && token != SLASH) {
-                        token = x.nextToken();
-                    }
-                    
-                    if (token == SLASH) {
-                        x.nextToken(); // 消耗自閉合標籤的 '>'
-                    }
+            
+            // Get the parent object where we'll replace the child
+            JSONObject parent;
+            if (parentPath.isEmpty()) {
+                // The replacement is at the root level
+                parent = root;
+            } else {
+                // Get the parent object
+                Object parentObj = new JSONPointer(parentPath).queryFrom(root);
+                if (!(parentObj instanceof JSONObject)) {
+                    throw new JSONException("Parent path does not point to a JSONObject: " + parentPath);
                 }
+                parent = (JSONObject) parentObj;
             }
+            
+            // Make sure the path exists before attempting replacement
+            parent.get(lastSegment); // This will throw if path doesn't exist
+            
+            // Replace the object at the path
+            parent.put(lastSegment, replacement);
+            
+            return root;
+        } catch (JSONPointerException e) {
+            throw new JSONException("Path not found: " + pathStr);
         }
     }
-    
-    System.out.println("已跳過標籤: " + tagName);
-}
 }

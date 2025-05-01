@@ -1501,7 +1501,7 @@ public class XMLTest {
 
 
     @Test
-    public void toJSONObject2_extractionTest() {
+    public void toJSONObject_extractionTest() {
         String xml = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"+
             "<contact>\n"+
             "  <nick>Crista </nick>\n"+
@@ -1513,7 +1513,7 @@ public class XMLTest {
             "</contact>";
 
         JSONPointer pointer = new JSONPointer("/contact/address/street/");
-        JSONObject result = XML.toJSONObject2(new StringReader(xml), pointer);
+        JSONObject result = XML.toJSONObject(new StringReader(xml), pointer);
 
         assertNotNull(result);
         assertEquals("Ave of Nowhere", result.getString("street"));
