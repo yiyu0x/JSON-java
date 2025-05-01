@@ -1499,9 +1499,12 @@ public class XMLTest {
         }
     }
 
-
+    /**
+     * Test extracting a street address using JSONPointer.
+     * This verifies that path with trailing slash works correctly.
+     */
     @Test
-    public void toJSONObject_extractionTest() {
+    public void toJSONObject_extractStreetTest() {
         String xml = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"+
             "<contact>\n"+
             "  <nick>Crista </nick>\n"+
@@ -1517,6 +1520,52 @@ public class XMLTest {
 
         assertNotNull(result);
         assertEquals("Ave of Nowhere", result.getString("street"));
+    }
+
+    /**
+     * Test extracting a zipcode using JSONPointer.
+     * This verifies that numeric content is preserved as string when extracted.
+     */
+    @Test
+    public void toJSONObject_extractZipcodeTest() {
+        String xml = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"+
+            "<contact>\n"+
+            "  <nick>Crista </nick>\n"+
+            "  <name>Crista Lopes</name>\n" +
+            "  <address>\n" +
+            "    <street>Ave of Nowhere</street>\n" +
+            "    <zipcode>92614</zipcode>\n" +
+            "  </address>\n" +
+            "</contact>";
+
+        JSONPointer pointer = new JSONPointer("/contact/address/zipcode/");
+        JSONObject result = XML.toJSONObject(new StringReader(xml), pointer);
+
+        assertNotNull(result);
+        assertEquals("92614", result.getString("zipcode"));
+    }
+
+    /**
+     * Test extracting a nickname using JSONPointer.
+     * This verifies that whitespace is preserved when extracted.
+     */
+    @Test
+    public void toJSONObject_extractNicknameTest() {
+        String xml = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"+
+            "<contact>\n"+
+            "  <nick>Crista </nick>\n"+
+            "  <name>Crista Lopes</name>\n" +
+            "  <address>\n" +
+            "    <street>Ave of Nowhere</street>\n" +
+            "    <zipcode>92614</zipcode>\n" +
+            "  </address>\n" +
+            "</contact>";
+
+        JSONPointer pointer = new JSONPointer("/contact/nick");
+        JSONObject result = XML.toJSONObject(new StringReader(xml), pointer);
+
+        assertNotNull(result);
+        assertEquals("Crista ", result.getString("nick"));
     }
 }
 

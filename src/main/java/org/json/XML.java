@@ -1148,8 +1148,13 @@ public class XML {
             throw new NullPointerException("JSONPointer must not be null");
         }
 
-        // First parse the entire XML document into a JSONObject
-        JSONObject root = toJSONObject(reader);
+        // Parse with keepStrings=true to preserve numbers as strings
+        // and disable whitespace trimming to preserve spaces
+        XMLParserConfiguration config = new XMLParserConfiguration()
+            .withKeepStrings(true)
+            .withShouldTrimWhitespace(false);
+        
+        JSONObject root = toJSONObject(reader, config);
         
         // Normalize the path by removing any trailing slash
         String pathStr = path.toString();
