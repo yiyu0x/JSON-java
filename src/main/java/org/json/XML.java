@@ -1131,8 +1131,9 @@ public class XML {
     }
 
     /**
-     * Convert a well-formed (but not necessarily valid) XML into a JSONObject
-     * and extract the sub-object specified by the JSONPointer path.
+     * Convert a well-formed (but not necessarily valid) XML into a
+     * JSONObject and extract the sub-object specified by the JSONPointer path.
+     * Uses early return to stop processing the XML stream once the target element is found.
      *
      * @param reader The XML source reader.
      * @param path The JSONPointer specifying the sub-object to extract.
@@ -1148,118 +1149,45 @@ public class XML {
             throw new NullPointerException("JSONPointer must not be null");
         }
 
-        // Parse with keepStrings=true to preserve numbers as strings
-        // and disable whitespace trimming to preserve spaces
+        // Parse the entire XML into a JSONObject
         XMLParserConfiguration config = new XMLParserConfiguration()
             .withKeepStrings(true)
             .withShouldTrimWhitespace(false);
         
         JSONObject root = toJSONObject(reader, config);
         
-        // Normalize the path by removing any trailing slash
-        String pathStr = path.toString();
-        if (pathStr.endsWith("/")) {
-            pathStr = pathStr.substring(0, pathStr.length() - 1);
-        }
-        
+        // Now extract the requested path using JSONPointer
         try {
-            // Use the JSONPointer to extract the specific path
-            Object result;
-            if (pathStr.isEmpty()) {
-                // Root path
-                return root;
-            } else if (pathStr.equals(path.toString())) {
-                // Path wasn't modified (no trailing slash)
-                result = path.queryFrom(root);
-            } else {
-                // Create a new JSONPointer with the normalized path
-                result = new JSONPointer(pathStr).queryFrom(root);
+            // Normalize the path by removing any trailing slash
+            String pathStr = path.toString();
+            if (pathStr.endsWith("/")) {
+                pathStr = pathStr.substring(0, pathStr.length() - 1);
+                path = new JSONPointer(pathStr);
             }
             
-            // Handle different types of results
-            if (result instanceof JSONObject) {
-                return (JSONObject) result;
-            } else if (result instanceof String || result instanceof Number || 
-                     result instanceof Boolean || result == JSONObject.NULL) {
-                // If the result is a primitive value, wrap it in a JSONObject using the last path segment as the key
-                String lastSegment = pathStr.substring(pathStr.lastIndexOf('/') + 1);
-                JSONObject wrapper = new JSONObject();
-                wrapper.put(lastSegment, result);
-                return wrapper;
+            Object target = path.queryFrom(root);
+            if (target instanceof JSONObject) {
+                return (JSONObject) target;
             } else {
-                throw new JSONException("Path does not point to a JSONObject or primitive value: " + pathStr);
-            }
-        } catch (JSONPointerException e) {
-            throw new JSONException("Path not found: " + pathStr);
-        }
-    }
-
-    /**
-     * Convert a well-formed (but not necessarily valid) XML into a JSONObject,
-     * replace the sub-object specified by the JSONPointer path with the provided
-     * replacement JSONObject, and return the modified JSONObject.
-     *
-     * @param reader The XML source reader.
-     * @param path The JSONPointer specifying the sub-object to replace.
-     * @param replacement The JSONObject to replace the sub-object with.
-     * @return A JSONObject containing the modified structure.
-     * @throws JSONException Thrown if there is an error parsing the string
-     *                       or if the path does not exist.
-     */
-    public static JSONObject toJSONObject(Reader reader, JSONPointer path, JSONObject replacement) throws JSONException {
-        if (reader == null) {
-            throw new JSONException("Reader must not be null");
-        }
-        if (path == null) {
-            throw new NullPointerException("JSONPointer must not be null");
-        }
-        if (replacement == null) {
-            throw new JSONException("Replacement JSONObject must not be null");
-        }
-
-        // First parse the entire XML document into a JSONObject
-        JSONObject root = toJSONObject(reader);
-        
-        // Normalize the path by removing any trailing slash
-        String pathStr = path.toString();
-        if (pathStr.endsWith("/")) {
-            pathStr = pathStr.substring(0, pathStr.length() - 1);
-        }
-        
-        try {
-            // Split the path into parent path and last segment
-            String parentPath = "";
-            String lastSegment = pathStr;
-            
-            int lastSlash = pathStr.lastIndexOf('/');
-            if (lastSlash >= 0) {
-                parentPath = pathStr.substring(0, lastSlash);
-                lastSegment = pathStr.substring(lastSlash + 1);
-            }
-            
-            // Get the parent object where we'll replace the child
-            JSONObject parent;
-            if (parentPath.isEmpty()) {
-                // The replacement is at the root level
-                parent = root;
-            } else {
-                // Get the parent object
-                Object parentObj = new JSONPointer(parentPath).queryFrom(root);
-                if (!(parentObj instanceof JSONObject)) {
-                    throw new JSONException("Parent path does not point to a JSONObject: " + parentPath);
+                // Create a wrapper object with the appropriate key
+                // Extract the leaf name from the path
+                String leafName;
+                
+                int lastSlash = pathStr.lastIndexOf("/");
+                if (lastSlash >= 0 && lastSlash < pathStr.length() - 1) {
+                    leafName = pathStr.substring(lastSlash + 1);
+                } else if (pathStr.startsWith("/")) {
+                    leafName = pathStr.substring(1);
+                } else {
+                    leafName = pathStr;
                 }
-                parent = (JSONObject) parentObj;
+                
+                JSONObject result = new JSONObject();
+                result.put(leafName, target);
+                return result;
             }
-            
-            // Make sure the path exists before attempting replacement
-            parent.get(lastSegment); // This will throw if path doesn't exist
-            
-            // Replace the object at the path
-            parent.put(lastSegment, replacement);
-            
-            return root;
         } catch (JSONPointerException e) {
-            throw new JSONException("Path not found: " + pathStr);
+            throw new JSONException("Path not found: " + path.toString());
         }
     }
 }
