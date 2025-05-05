@@ -9,6 +9,7 @@ import java.io.StringReader;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.util.Iterator;
+import java.util.function.Function;
 
 /**
  * This provides static methods to convert an XML text into a JSONObject, and to
@@ -1695,6 +1696,57 @@ public class XML {
                     return false;
                 }
             }
+        }
+    }
+
+    // Milestone 3: keyTransformer version 
+    public static org.json.JSONObject toJSONObject(Reader reader, Function<String, String> keyTransformer) {
+        StringBuilder xmlBuilder = new StringBuilder();
+        XMLTokener tokener = new XMLTokener(reader);
+        while (tokener.more()) {
+            tokener.skipPast("<");
+            if (tokener.more()) {
+                Object content = tokener.nextContent();
+                if (content instanceof String) {
+                    String str = (String) content;
+                    if (str.startsWith("?") || str.startsWith("!")) continue;
+                    xmlBuilder.append(transformTag(str, keyTransformer));
+                }
+            }
+        }
+        JSONObject result = toJSONObject(xmlBuilder.toString());
+        System.out.println("[toJSONObject(Reader, Function)]\n" + result.toString(4));
+        return result;
+    }
+
+    private static String transformTag(String tagString, Function<String, String> keyTransformer) {
+        if (tagString.startsWith("/")) {
+            return transformEndTag(tagString, keyTransformer);
+        } else {
+            return transformStartTag(tagString, keyTransformer);
+        }
+    }
+
+    private static String transformEndTag(String tagString, Function<String, String> keyTransformer) {
+        int gtIdx = tagString.indexOf('>');
+        String tag = tagString.substring(1, gtIdx);
+        String newTag = keyTransformer.apply(tag);
+        return "</" + newTag + tagString.substring(gtIdx);
+    }
+
+    private static String transformStartTag(String tagString, Function<String, String> keyTransformer) {
+        int gtIdx = tagString.indexOf('>');
+        String beforeGt = tagString.substring(0, gtIdx);
+        if (beforeGt.contains("id=")) {
+            int idIdx = tagString.indexOf("id=") - 1;
+            String tag = tagString.substring(0, idIdx);
+            String newTag = keyTransformer.apply(tag);
+            String newId = keyTransformer.apply("id");
+            return "<" + newTag + " " + newId + tagString.substring(tagString.indexOf("id=") + 2);
+        } else {
+            String tag = tagString.substring(0, gtIdx);
+            String newTag = keyTransformer.apply(tag);
+            return "<" + newTag + tagString.substring(gtIdx);
         }
     }
 }
