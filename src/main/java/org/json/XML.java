@@ -1715,7 +1715,6 @@ public class XML {
             }
         }
         JSONObject result = toJSONObject(xmlBuilder.toString());
-        System.out.println("[toJSONObject(Reader, Function)]\n" + result.toString(4));
         return result;
     }
 
