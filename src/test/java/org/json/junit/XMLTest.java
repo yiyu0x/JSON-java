@@ -1538,10 +1538,10 @@ public class XMLTest {
     }
     
     /**
-     * Test: Transform all XML keys with a prefix string and verify the resulting JSON structure (alternative style)
+     * Test: Transform all XML keys with a prefix string and verify the resulting JSON structure
      */
     @Test
-    public void testTransformKeysWithPrefixStyleB() {
+    public void testTransformKeysWithPrefixStyle() {
         final String prefix = "swe262_";
         try (FileReader reader = new FileReader("src/test/java/org/json/junit/testXML/books.xml")) {
             Function<String, String> prefixer = k -> prefix + k;
@@ -1664,10 +1664,10 @@ public class XMLTest {
     }
 
     /**
-     * Test: Transform all XML keys with a suffix string and verify the resulting JSON structure (alternative style)
+     * Test: Transform all XML keys with a suffix string and verify the resulting JSON structure
      */
     @Test
-    public void testTransformKeysWithSuffixStyleB() {
+    public void testTransformKeysWithSuffixStyle() {
         final String suffix = "_swe262";
         FileReader reader = null;
         try {
