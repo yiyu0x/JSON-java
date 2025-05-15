@@ -17,6 +17,7 @@ import java.math.BigInteger;
 import java.util.*;
 import java.util.Map.Entry;
 import java.util.regex.Pattern;
+import java.util.stream.Stream;
 
 /**
  * A JSONObject is an unordered collection of name/value pairs. Its external
@@ -3029,5 +3030,60 @@ public class JSONObject {
         }
         if (negativeFirstChar) {return "-0";}
         return "0";
+    }
+
+    // Milestone 4
+    private Stream.Builder<Object> _streamBuilder = Stream.builder();
+
+    /**
+     * Flattens this JSONObject into a stream of objects (null or Map<String, Object>),
+     * recursively traversing nested JSONObjects and JSONArrays.
+     * @return a stream of objects inside this JSONObject
+     */
+    public Stream<Object> toStream() {
+        for (Entry<String, Object> e : this.map.entrySet()) {
+            if (NULL.equals(e)) {
+                _streamBuilder.add(null);
+            } else if (e.getValue() instanceof JSONObject || e.getValue() instanceof JSONArray) {
+                _toStreamHelper("/" + e.getKey(), e.getValue());
+            } else {
+                Map<String, Object> entryMap = new HashMap<>();
+                entryMap.put("/" + e.getKey(), e.getValue());
+                _streamBuilder.add(entryMap);
+            }
+        }
+        return _streamBuilder.build();
+    }
+
+    /**
+     * Internal recursive helper for toStream().
+     * @param path current JSON path
+     * @param obj current value (JSONObject or JSONArray)
+     */
+    private void _toStreamHelper(String path, Object obj) {
+        if (obj instanceof JSONObject) {
+            JSONObject jsonObj = (JSONObject) obj;
+            for (Entry<String, Object> sub : jsonObj.entrySet()) {
+                if (sub.getValue() instanceof JSONObject || sub.getValue() instanceof JSONArray) {
+                    _toStreamHelper(path + "/" + sub.getKey(), sub.getValue());
+                } else {
+                    Map<String, Object> leafMap = new HashMap<>();
+                    leafMap.put(path + "/" + sub.getKey(), sub.getValue());
+                    _streamBuilder.add(leafMap);
+                }
+            }
+        } else if (obj instanceof JSONArray) {
+            int i = 1;
+            for (Object el : (JSONArray) obj) {
+                if (el instanceof JSONObject || el instanceof JSONArray) {
+                    _toStreamHelper(path + "/" + i, el);
+                } else {
+                    Map<String, Object> leafMap = new HashMap<>();
+                    leafMap.put(path + "/" + i, el);
+                    _streamBuilder.add(leafMap);
+                }
+                i++;
+            }
+        }
     }
 }
