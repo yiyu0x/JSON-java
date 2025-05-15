@@ -87,14 +87,14 @@ System.out.println(obj2.toString(2));
 
 This project includes unit tests for the Milestone 3 keyTransformer API in `src/test/java/org/json/junit/XMLTest.java`, including:
 
-- `testTransformKeysWithPrefixStyle()`:
+- `toJSONObjectWithPrefixTransformerTest()`:
   - Tests adding a prefix (e.g., `swe262_`) to all XML keys and verifies the resulting JSONObject structure matches expectations.
   - Example usage:
     ```java
     Function<String, String> prefixer = k -> "swe262_" + k;
     JSONObject actual = XML.toJSONObject(reader, prefixer);
     ```
-- `testTransformKeysWithSuffixStyle()`:
+- `toJSONObjectWithSuffixTransformerTest()`:
   - Tests adding a suffix (e.g., `_swe262`) to all XML keys and verifies the resulting JSONObject structure matches expectations.
   - Example usage:
     ```java

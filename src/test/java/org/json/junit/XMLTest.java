@@ -1541,7 +1541,7 @@ public class XMLTest {
      * Test: Transform all XML keys with a prefix string and verify the resulting JSON structure
      */
     @Test
-    public void testTransformKeysWithPrefixStyle() {
+    public void toJSONObjectWithPrefixTransformerTest() {
         final String prefix = "swe262_";
         try (FileReader reader = new FileReader("src/test/java/org/json/junit/testXML/books.xml")) {
             Function<String, String> prefixer = k -> prefix + k;
@@ -1667,7 +1667,7 @@ public class XMLTest {
      * Test: Transform all XML keys with a suffix string and verify the resulting JSON structure
      */
     @Test
-    public void testTransformKeysWithSuffixStyle() {
+    public void toJSONObjectWithSuffixTransformerTest() {
         final String suffix = "_swe262";
         FileReader reader = null;
         try {
