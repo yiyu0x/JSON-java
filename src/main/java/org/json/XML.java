@@ -10,6 +10,10 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.util.Iterator;
 import java.util.function.Function;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.function.Consumer;
 
 /**
  * This provides static methods to convert an XML text into a JSONObject, and to
@@ -857,7 +861,7 @@ public class XML {
      *
      * @param string
      *            The source string.
-     * @param config Configuration options for the parser.
+     * @param config Configuration options for the parser
      * @return A JSONObject containing the structured data from the XML string.
      * @throws JSONException Thrown if there is an errors while parsing the string
      */
@@ -1747,5 +1751,70 @@ public class XML {
             String newTag = keyTransformer.apply(tag);
             return "<" + newTag + tagString.substring(gtIdx);
         }
+    }
+    
+    //  Milestone 5
+    /**
+     * Helper class that facilitates asynchronous processing of XML to JSONObject conversion
+     * This wrapper creates a Future object for non-blocking operations
+     */
+    private static class FutureJsonObject {
+        // Single thread executor to handle async operations
+        private final ExecutorService taskExecutor = Executors.newSingleThreadExecutor();
+
+        /**
+         * Performs XML to JSON conversion in background thread
+         * 
+         * @param reader Source of XML data
+         * @param keyTransformer Function to transform keys
+         * @return Future containing the conversion result
+         */
+        public Future<JSONObject> toJSONObject(Reader reader, Function keyTransformer) throws Exception {
+            // Lambda expression for cleaner implementation
+            return taskExecutor.submit(() -> XML.toJSONObject(reader, keyTransformer));
+        }
+
+        /**
+         * Releases thread resources
+         */
+        public void stopFuture() {
+            // Terminate the executor service
+            taskExecutor.shutdown();
+        }
+    }
+
+    /**
+     * Processes XML data asynchronously with key transformation
+     * 
+     * @param reader          XML input source
+     * @param keyTransformer  Function that transforms tag/attribute keys
+     * @param exceptionHandler Callback for error handling
+     * @return A Future representing pending completion of the conversion
+     */
+    public static Future<JSONObject> toJSONObject(Reader reader, Function<String, String> keyTransformer, Consumer<Exception> exceptionHandler) {
+        // Define variables with proper scope
+        FutureJsonObject processor = null;
+        Future<JSONObject> result = null;
+        
+        try {
+            // Input validation
+            if (keyTransformer == null) {
+                throw new Exception();
+            }
+            
+            // Initialize processor and execute operation
+            processor = new FutureJsonObject();
+            result = processor.toJSONObject(reader, keyTransformer);
+            
+            // Resource management - cleanup if operation completed synchronously
+            if (result.isDone()) {
+                processor.stopFuture();
+            }
+        } catch (Exception error) {
+            // Forward exception to caller-provided handler
+            exceptionHandler.accept(error);
+        }
+        
+        return result;
     }
 }

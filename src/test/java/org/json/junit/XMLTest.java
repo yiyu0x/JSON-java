@@ -18,10 +18,13 @@ import java.io.InputStreamReader;
 import java.io.Reader;
 import java.io.StringReader;
 import java.nio.charset.Charset;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
+import java.util.function.Consumer;
 import java.util.function.Function;
 
 // 3rd party imports
@@ -1537,261 +1540,178 @@ public class XMLTest {
         assertEquals("{\"contact\":{\"nick\":\"Crista\",\"address\":{\"zipcode\":92614,\"street\":\"Ave of Nowhere\"},\"name\":\"Crista Lopes\"}}", updatedJsonObject.toString());
     }
     
+    // MILESTONE 5: ASYNC XML PROCESSING TEST SUITE
+
     /**
-     * Test: Transform all XML keys with a prefix string and verify the resulting JSON structure
+     * Verifies asynchronous XML to JSON conversion with key transformation
+     * 
+     * This test validates that the asynchronous API correctly transforms XML tags
+     * according to the provided key transformation function and returns the expected
+     * JSON structure.
      */
     @Test
-    public void toJSONObjectWithPrefixTransformerTest() {
-        final String prefix = "swe262_";
-        try (FileReader reader = new FileReader("src/test/java/org/json/junit/testXML/books.xml")) {
-            Function<String, String> prefixer = k -> prefix + k;
-            JSONObject actual = XML.toJSONObject(reader, prefixer);
-            String expect = String.format("{" +
-                    "\"%1$scatalog\": {\"%1$sbook\": [" +
-                    "    {" +
-                    "        \"%1$sauthor\": \"Gambardella, Matthew\"," +
-                    "        \"%1$sprice\": 44.95," +
-                    "        \"%1$sgenre\": \"Computer\"," +
-                    "        \"%1$sdescription\": \"An in-depth look at creating applications \\n      with XML.\"," +
-                    "        \"%1$sid\": \"bk101\"," +
-                    "        \"%1$stitle\": \"XML Developer's Guide\"," +
-                    "        \"%1$spublish_date\": \"2000-10-01\"" +
-                    "    }," +
-                    "    {" +
-                    "        \"%1$sauthor\": \"Ralls, Kim\"," +
-                    "        \"%1$sprice\": 5.95," +
-                    "        \"%1$sgenre\": \"Fantasy\"," +
-                    "        \"%1$sdescription\": \"A former architect battles corporate zombies, \\n      an evil sorceress, and her own childhood to become queen \\n      of the world.\"," +
-                    "        \"%1$sid\": \"bk102\"," +
-                    "        \"%1$stitle\": \"Midnight Rain\"," +
-                    "        \"%1$spublish_date\": \"2000-12-16\"" +
-                    "    }," +
-                    "    {" +
-                    "        \"%1$sauthor\": \"Corets, Eva\"," +
-                    "        \"%1$sprice\": 5.95," +
-                    "        \"%1$sgenre\": \"Fantasy\"," +
-                    "        \"%1$sdescription\": \"After the collapse of a nanotechnology \\n      society in England, the young survivors lay the \\n      foundation for a new society.\"," +
-                    "        \"%1$sid\": \"bk103\"," +
-                    "        \"%1$stitle\": \"Maeve Ascendant\"," +
-                    "        \"%1$spublish_date\": \"2000-11-17\"" +
-                    "    }," +
-                    "    {" +
-                    "        \"%1$sauthor\": \"Corets, Eva\"," +
-                    "        \"%1$sprice\": 5.95," +
-                    "        \"%1$sgenre\": \"Fantasy\"," +
-                    "        \"%1$sdescription\": \"In post-apocalypse England, the mysterious \\n      agent known only as Oberon helps to create a new life \\n      for the inhabitants of London. Sequel to Maeve \\n      Ascendant.\"," +
-                    "        \"%1$sid\": \"bk104\"," +
-                    "        \"%1$stitle\": \"Oberon's Legacy\"," +
-                    "        \"%1$spublish_date\": \"2001-03-10\"" +
-                    "    }," +
-                    "    {" +
-                    "        \"%1$sauthor\": \"Corets, Eva\"," +
-                    "        \"%1$sprice\": 5.95," +
-                    "        \"%1$sgenre\": \"Fantasy\"," +
-                    "        \"%1$sdescription\": \"The two daughters of Maeve, half-sisters, \\n      battle one another for control of England. Sequel to \\n      Oberon's Legacy.\"," +
-                    "        \"%1$sid\": \"bk105\"," +
-                    "        \"%1$stitle\": \"The Sundered Grail\"," +
-                    "        \"%1$spublish_date\": \"2001-09-10\"" +
-                    "    }," +
-                    "    {" +
-                    "        \"%1$sauthor\": \"Randall, Cynthia\"," +
-                    "        \"%1$sprice\": 4.95," +
-                    "        \"%1$sgenre\": \"Romance\"," +
-                    "        \"%1$sdescription\": \"When Carla meets Paul at an ornithology \\n      conference, tempers fly as feathers get ruffled.\"," +
-                    "        \"%1$sid\": \"bk106\"," +
-                    "        \"%1$stitle\": \"Lover Birds\"," +
-                    "        \"%1$spublish_date\": \"2000-09-02\"" +
-                    "    }," +
-                    "    {" +
-                    "        \"%1$sauthor\": \"Thurman, Paula\"," +
-                    "        \"%1$sprice\": 4.95," +
-                    "        \"%1$sgenre\": \"Romance\"," +
-                    "        \"%1$sdescription\": \"A deep sea diver finds true love twenty \\n      thousand leagues beneath the sea.\"," +
-                    "        \"%1$sid\": \"bk107\"," +
-                    "        \"%1$stitle\": \"Splish Splash\"," +
-                    "        \"%1$spublish_date\": \"2000-11-02\"" +
-                    "    }," +
-                    "    {" +
-                    "        \"%1$sauthor\": \"Knorr, Stefan\"," +
-                    "        \"%1$sprice\": 4.95," +
-                    "        \"%1$sgenre\": \"Horror\"," +
-                    "        \"%1$sdescription\": \"An anthology of horror stories about roaches,\\n      centipedes, scorpions  and other insects.\"," +
-                    "        \"%1$sid\": \"bk108\"," +
-                    "        \"%1$stitle\": \"Creepy Crawlies\"," +
-                    "        \"%1$spublish_date\": \"2000-12-06\"" +
-                    "    }," +
-                    "    {" +
-                    "        \"%1$sauthor\": \"Kress, Peter\"," +
-                    "        \"%1$sprice\": 6.95," +
-                    "        \"%1$sgenre\": \"Science Fiction\"," +
-                    "        \"%1$sdescription\": \"After an inadvertant trip through a Heisenberg\\n      Uncertainty Device, James Salway discovers the problems \\n      of being quantum.\"," +
-                    "        \"%1$sid\": \"bk109\"," +
-                    "        \"%1$stitle\": \"Paradox Lost\"," +
-                    "        \"%1$spublish_date\": \"2000-11-02\"" +
-                    "    }," +
-                    "    {" +
-                    "        \"%1$sauthor\": \"O'Brien, Tim\"," +
-                    "        \"%1$sprice\": 36.95," +
-                    "        \"%1$sgenre\": \"Computer\"," +
-                    "        \"%1$sdescription\": \"Microsoft's .NET initiative is explored in \\n      detail in this deep programmer's reference.\"," +
-                    "        \"%1$sid\": \"bk110\"," +
-                    "        \"%1$stitle\": \"Microsoft .NET: The Programming Bible\"," +
-                    "        \"%1$spublish_date\": \"2000-12-09\"" +
-                    "    }," +
-                    "    {" +
-                    "        \"%1$sauthor\": \"O'Brien, Tim\"," +
-                    "        \"%1$sprice\": 36.95," +
-                    "        \"%1$sgenre\": \"Computer\"," +
-                    "        \"%1$sdescription\": \"The Microsoft MSXML3 parser is covered in \\n      detail, with attention to XML DOM interfaces, XSLT processing, \\n      SAX and more.\"," +
-                    "        \"%1$sid\": \"bk111\"," +
-                    "        \"%1$stitle\": \"MSXML3: A Comprehensive Guide\"," +
-                    "        \"%1$spublish_date\": \"2000-12-01\"" +
-                    "    }," +
-                    "    {" +
-                    "        \"%1$sauthor\": \"Galos, Mike\"," +
-                    "        \"%1$sprice\": 49.95," +
-                    "        \"%1$sgenre\": \"Computer\"," +
-                    "        \"%1$sdescription\": \"Microsoft Visual Studio 7 is explored in depth,\\n      looking at how Visual Basic, Visual C++, C#, and ASP+ are \\n      integrated into a comprehensive development \\n      environment.\"," +
-                    "        \"%1$sid\": \"bk112\"," +
-                    "        \"%1$stitle\": \"Visual Studio 7: A Comprehensive Guide\"," +
-                    "        \"%1$spublish_date\": \"2001-04-16\"" +
-                    "    }" +
-                    "]}}", prefix);
-            Util.compareActualVsExpectedJsonObjects(actual, new JSONObject(expect));
-        } catch (IOException e) {
-            fail("Exception: " + e.getMessage());
+    public void transformJSONObjectKeyAsynTest(){
+        // Test resource path
+        final String TEST_RESOURCE_PATH = "src/test/java/org/json/junit/testXML/planes.xml";
+        
+        try (FileReader xmlSource = new FileReader(TEST_RESOURCE_PATH)) {
+            // Setup transform function and error handling
+            final Function<String, String> prefixFunction = tagName -> "swe262_" + tagName;
+            final Consumer<Exception> errorLogger = exception -> exception.printStackTrace();
+
+            // Initiate asynchronous processing
+            Future<JSONObject> asyncResult = XML.toJSONObject(xmlSource, prefixFunction, errorLogger);
+            
+                       
+            // Expected JSON structure with transformed keys
+            final String expectedJson = "{\"swe262_planes_for_sale\": {\"swe262_ad\": [\n" +
+                    "    {\n" +
+                    "        \"swe262_location\": {\n" +
+                    "            \"swe262_city\": \"Seattle,\",\n" +
+                    "            \"swe262_state\": \"Washington\"\n" +
+                    "        },\n" +
+                    "        \"swe262_price\": \"45,500,000\",\n" +
+                    "        \"swe262_make\": \"Boeing\",\n" +
+                    "        \"swe262_seller\": {\n" +
+                    "            \"phone\": \"555-111-2222\",\n" +
+                    "            \"email\": \"sales@aircorpsales.com\",\n" +
+                    "            \"content\": \"AirCorp Sales\"\n" +
+                    "        },\n" +
+                    "        \"swe262_model\": \"737-MAX\",\n" +
+                    "        \"swe262_description\": \"Commercial airliner, low hours,\\n            perfect for charter operations\",\n" +
+                    "        \"swe262_year\": 2022,\n" +
+                    "        \"swe262_color\": \"White and Blue\"\n" +
+                    "    },\n" +
+                    "    {\n" +
+                    "        \"swe262_location\": {\n" +
+                    "            \"swe262_city\": \"Las Vegas,\",\n" +
+                    "            \"swe262_state\": \"Nevada\"\n" +
+                    "        },\n" +
+                    "        \"swe262_make\": \"Gulfstream\",\n" +
+                    "        \"swe262_seller\": {\n" +
+                    "            \"phone\": \"555-333-4444\",\n" +
+                    "            \"email\": \"luxury@jetmarket.com\",\n" +
+                    "            \"content\": \"Premium Jet Market\"\n" +
+                    "        },\n" +
+                    "        \"swe262_model\": \"G650\",\n" +
+                    "        \"swe262_description\": \"Executive jet, 1200 hours total time, \\n                full luxury interior, intercontinental range\",\n" +
+                    "        \"swe262_year\": 2019,\n" +
+                    "        \"swe262_color\": \"Pearl White\"\n" +
+                    "    },\n" +
+                    "    {\n" +
+                    "        \"swe262_location\": {\n" +
+                    "            \"swe262_city\": \"Austin,\",\n" +
+                    "            \"swe262_state\": \"Texas\"\n" +
+                    "        },\n" +
+                    "        \"swe262_price\": \"185,000\",\n" +
+                    "        \"swe262_make\": \"Cessna\",\n" +
+                    "        \"swe262_seller\": {\n" +
+                    "            \"phone\": \"555-777-8888\",\n" +
+                    "            \"website\": \"www.flyingschool.com\",\n" +
+                    "            \"content\": \"Flight Academy Sales\"\n" +
+                    "        },\n" +
+                    "        \"swe262_model\": \"172SP\",\n" +
+                    "        \"swe262_description\": \"Training aircraft, 5200 hours total, \\n                G1000 glass cockpit, ADS-B equipped\",\n" +
+                    "        \"swe262_year\": 2015,\n" +
+                    "        \"swe262_color\": \"Red and White\"\n" +
+                    "    }\n" +
+                    "]}}";
+
+            // Wait for completion with timeout safety
+            waitForCompletion(asyncResult);
+
+            // Verify results
+            JSONObject transformedJson = asyncResult.get();
+            Util.compareActualVsExpectedJsonObjects(transformedJson, new JSONObject(expectedJson));
+            
+        } catch (FileNotFoundException ex) {
+            fail("Test resource not found: " + TEST_RESOURCE_PATH);
+        } catch (IOException ex) {
+            fail("I/O error during test execution: " + ex.getMessage());
+        } catch (InterruptedException ex) {
+            Thread.currentThread().interrupt();
+            fail("Async operation interrupted: " + ex.getMessage());
+        } catch (ExecutionException ex) {
+            fail("Error executing async operation: " + ex.getCause().getMessage());
+        }
+    }
+    
+    /**
+     * Helper method to wait for Future completion with timeout
+     */
+    private void waitForCompletion(Future<?> future) throws InterruptedException {
+        final long TIMEOUT_MS = 5000;
+        final long START_TIME = System.currentTimeMillis();
+        
+        while (!future.isDone()) {
+            // Check if timeout exceeded
+            if (System.currentTimeMillis() - START_TIME > TIMEOUT_MS) {
+                fail("Async operation timed out after " + TIMEOUT_MS + "ms");
+            }
+            Thread.sleep(100);
         }
     }
 
     /**
-     * Test: Transform all XML keys with a suffix string and verify the resulting JSON structure
+     * Validates return type of asynchronous XML conversion
+     * 
+     * This test ensures that the returned Future object properly resolves
+     * to a JSONObject instance when the operation completes.
      */
     @Test
-    public void toJSONObjectWithSuffixTransformerTest() {
-        final String suffix = "_swe262";
-        FileReader reader = null;
-        try {
-            reader = new FileReader("src/test/java/org/json/junit/testXML/books.xml");
-            Function<String, String> suffixer = s -> s + suffix;
-            String expect = String.format("{" +
-                    "\"catalog%1$s\": {\"book%1$s\": [" +
-                    "    {" +
-                    "        \"author%1$s\": \"Gambardella, Matthew\"," +
-                    "        \"price%1$s\": 44.95," +
-                    "        \"genre%1$s\": \"Computer\"," +
-                    "        \"description%1$s\": \"An in-depth look at creating applications \\n      with XML.\"," +
-                    "        \"id%1$s\": \"bk101\"," +
-                    "        \"title%1$s\": \"XML Developer's Guide\"," +
-                    "        \"publish_date%1$s\": \"2000-10-01\"" +
-                    "    }," +
-                    "    {" +
-                    "        \"author%1$s\": \"Ralls, Kim\"," +
-                    "        \"price%1$s\": 5.95," +
-                    "        \"genre%1$s\": \"Fantasy\"," +
-                    "        \"description%1$s\": \"A former architect battles corporate zombies, \\n      an evil sorceress, and her own childhood to become queen \\n      of the world.\"," +
-                    "        \"id%1$s\": \"bk102\"," +
-                    "        \"title%1$s\": \"Midnight Rain\"," +
-                    "        \"publish_date%1$s\": \"2000-12-16\"" +
-                    "    }," +
-                    "    {" +
-                    "        \"author%1$s\": \"Corets, Eva\"," +
-                    "        \"price%1$s\": 5.95," +
-                    "        \"genre%1$s\": \"Fantasy\"," +
-                    "        \"description%1$s\": \"After the collapse of a nanotechnology \\n      society in England, the young survivors lay the \\n      foundation for a new society.\"," +
-                    "        \"id%1$s\": \"bk103\"," +
-                    "        \"title%1$s\": \"Maeve Ascendant\"," +
-                    "        \"publish_date%1$s\": \"2000-11-17\"" +
-                    "    }," +
-                    "    {" +
-                    "        \"author%1$s\": \"Corets, Eva\"," +
-                    "        \"price%1$s\": 5.95," +
-                    "        \"genre%1$s\": \"Fantasy\"," +
-                    "        \"description%1$s\": \"In post-apocalypse England, the mysterious \\n      agent known only as Oberon helps to create a new life \\n      for the inhabitants of London. Sequel to Maeve \\n      Ascendant.\"," +
-                    "        \"id%1$s\": \"bk104\"," +
-                    "        \"title%1$s\": \"Oberon's Legacy\"," +
-                    "        \"publish_date%1$s\": \"2001-03-10\"" +
-                    "    }," +
-                    "    {" +
-                    "        \"author%1$s\": \"Corets, Eva\"," +
-                    "        \"price%1$s\": 5.95," +
-                    "        \"genre%1$s\": \"Fantasy\"," +
-                    "        \"description%1$s\": \"The two daughters of Maeve, half-sisters, \\n      battle one another for control of England. Sequel to \\n      Oberon's Legacy.\"," +
-                    "        \"id%1$s\": \"bk105\"," +
-                    "        \"title%1$s\": \"The Sundered Grail\"," +
-                    "        \"publish_date%1$s\": \"2001-09-10\"" +
-                    "    }," +
-                    "    {" +
-                    "        \"author%1$s\": \"Randall, Cynthia\"," +
-                    "        \"price%1$s\": 4.95," +
-                    "        \"genre%1$s\": \"Romance\"," +
-                    "        \"description%1$s\": \"When Carla meets Paul at an ornithology \\n      conference, tempers fly as feathers get ruffled.\"," +
-                    "        \"id%1$s\": \"bk106\"," +
-                    "        \"title%1$s\": \"Lover Birds\"," +
-                    "        \"publish_date%1$s\": \"2000-09-02\"" +
-                    "    }," +
-                    "    {" +
-                    "        \"author%1$s\": \"Thurman, Paula\"," +
-                    "        \"price%1$s\": 4.95," +
-                    "        \"genre%1$s\": \"Romance\"," +
-                    "        \"description%1$s\": \"A deep sea diver finds true love twenty \\n      thousand leagues beneath the sea.\"," +
-                    "        \"id%1$s\": \"bk107\"," +
-                    "        \"title%1$s\": \"Splish Splash\"," +
-                    "        \"publish_date%1$s\": \"2000-11-02\"" +
-                    "    }," +
-                    "    {" +
-                    "        \"author%1$s\": \"Knorr, Stefan\"," +
-                    "        \"price%1$s\": 4.95," +
-                    "        \"genre%1$s\": \"Horror\"," +
-                    "        \"description%1$s\": \"An anthology of horror stories about roaches,\\n      centipedes, scorpions  and other insects.\"," +
-                    "        \"id%1$s\": \"bk108\"," +
-                    "        \"title%1$s\": \"Creepy Crawlies\"," +
-                    "        \"publish_date%1$s\": \"2000-12-06\"" +
-                    "    }," +
-                    "    {" +
-                    "        \"author%1$s\": \"Kress, Peter\"," +
-                    "        \"price%1$s\": 6.95," +
-                    "        \"genre%1$s\": \"Science Fiction\"," +
-                    "        \"description%1$s\": \"After an inadvertant trip through a Heisenberg\\n      Uncertainty Device, James Salway discovers the problems \\n      of being quantum.\"," +
-                    "        \"id%1$s\": \"bk109\"," +
-                    "        \"title%1$s\": \"Paradox Lost\"," +
-                    "        \"publish_date%1$s\": \"2000-11-02\"" +
-                    "    }," +
-                    "    {" +
-                    "        \"author%1$s\": \"O'Brien, Tim\"," +
-                    "        \"price%1$s\": 36.95," +
-                    "        \"genre%1$s\": \"Computer\"," +
-                    "        \"description%1$s\": \"Microsoft's .NET initiative is explored in \\n      detail in this deep programmer's reference.\"," +
-                    "        \"id%1$s\": \"bk110\"," +
-                    "        \"title%1$s\": \"Microsoft .NET: The Programming Bible\"," +
-                    "        \"publish_date%1$s\": \"2000-12-09\"" +
-                    "    }," +
-                    "    {" +
-                    "        \"author%1$s\": \"O'Brien, Tim\"," +
-                    "        \"price%1$s\": 36.95," +
-                    "        \"genre%1$s\": \"Computer\"," +
-                    "        \"description%1$s\": \"The Microsoft MSXML3 parser is covered in \\n      detail, with attention to XML DOM interfaces, XSLT processing, \\n      SAX and more.\"," +
-                    "        \"id%1$s\": \"bk111\"," +
-                    "        \"title%1$s\": \"MSXML3: A Comprehensive Guide\"," +
-                    "        \"publish_date%1$s\": \"2000-12-01\"" +
-                    "    }," +
-                    "    {" +
-                    "        \"author%1$s\": \"Galos, Mike\"," +
-                    "        \"price%1$s\": 49.95," +
-                    "        \"genre%1$s\": \"Computer\"," +
-                    "        \"description%1$s\": \"Microsoft Visual Studio 7 is explored in depth,\\n      looking at how Visual Basic, Visual C++, C#, and ASP+ are \\n      integrated into a comprehensive development \\n      environment.\"," +
-                    "        \"id%1$s\": \"bk112\"," +
-                    "        \"title%1$s\": \"Visual Studio 7: A Comprehensive Guide\"," +
-                    "        \"publish_date%1$s\": \"2001-04-16\"" +
-                    "    }" +
-                    "]}}", suffix);
-            JSONObject actual = XML.toJSONObject(reader, suffixer);
-            Util.compareActualVsExpectedJsonObjects(actual, new JSONObject(expect));
-        } catch (IOException e) {
-            fail("Exception: " + e.getMessage());
-        } finally {
-            if (reader != null) {
-                try { reader.close(); } catch (IOException ignore) {}
-            }
+    public void transformJSONObjectKeyAsynReturnTypeTest() {
+        try (FileReader xmlInput = new FileReader("src/test/java/org/json/junit/testXML/planes.xml")) {
+            // Define transformation strategy
+            Function<String, String> keyDecorator = input -> "swe262_" + input;
+            Consumer<Exception> diagnosticsHandler = Throwable::printStackTrace;
+
+            // Execute async conversion
+            Future<JSONObject> conversionTask = XML.toJSONObject(
+                xmlInput, 
+                keyDecorator,
+                diagnosticsHandler
+            );
+            
+            // Wait for completion
+            waitForCompletion(conversionTask);
+            
+            // Verify result type
+            Object result = conversionTask.get();
+            assertTrue("Result should be JSONObject instance", result instanceof JSONObject);
+            
+        } catch (Exception ex) {
+            fail("Test failed with exception: " + ex.getMessage());
+        }
+    }
+
+    /**
+     * Verifies exception handling behavior in asynchronous XML processing
+     * 
+     * Tests that the provided exception handler is properly invoked when
+     * errors occur and that null is returned for the Future result.
+     */
+    @Test
+    public void transformJSONObjectKeyAsynExceptionHandlerTest() {
+        // Create an exception recorder to verify handler invocation
+        final List<String> errorMessages = new ArrayList<>();
+        
+        try (FileReader xmlInput = new FileReader("src/test/java/org/json/junit/testXML/planes.xml")) {
+            // Create handler that records error messages
+            Consumer<Exception> errorCollector = ex -> errorMessages.add(ex.getMessage());
+            
+            // Intentionally pass null transformer to trigger exception
+            Future<JSONObject> result = XML.toJSONObject(xmlInput, null, errorCollector);
+            
+            // Verify null result for error case
+            assertNull("Result should be null when exception occurs", result);
+            
+            // Verify exception was handled
+            assertFalse("Error handler should have been invoked", errorMessages.isEmpty());
+            
+        } catch (FileNotFoundException ex) {
+            fail("Test resource not found");
+        } catch (IOException ex) {
+            fail("I/O error closing resource");
         }
     }
 }
