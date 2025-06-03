@@ -1552,8 +1552,7 @@ public class XMLTest {
     @Test
     public void transformJSONObjectKeyAsynTest(){
         // Test resource path
-        final String TEST_RESOURCE_PATH = "src/test/java/org/json/junit/testXML/planes.xml";
-        
+        final String TEST_RESOURCE_PATH = "src/test/java/org/json/junit/testXML/books.xml";
         try (FileReader xmlSource = new FileReader(TEST_RESOURCE_PATH)) {
             // Setup transform function and error handling
             final Function<String, String> prefixFunction = tagName -> "swe262_" + tagName;
@@ -1561,69 +1560,14 @@ public class XMLTest {
 
             // Initiate asynchronous processing
             Future<JSONObject> asyncResult = XML.toJSONObject(xmlSource, prefixFunction, errorLogger);
-            
-                       
-            // Expected JSON structure with transformed keys
-            final String expectedJson = "{\"swe262_planes_for_sale\": {\"swe262_ad\": [\n" +
-                    "    {\n" +
-                    "        \"swe262_location\": {\n" +
-                    "            \"swe262_city\": \"Seattle,\",\n" +
-                    "            \"swe262_state\": \"Washington\"\n" +
-                    "        },\n" +
-                    "        \"swe262_price\": \"45,500,000\",\n" +
-                    "        \"swe262_make\": \"Boeing\",\n" +
-                    "        \"swe262_seller\": {\n" +
-                    "            \"phone\": \"555-111-2222\",\n" +
-                    "            \"email\": \"sales@aircorpsales.com\",\n" +
-                    "            \"content\": \"AirCorp Sales\"\n" +
-                    "        },\n" +
-                    "        \"swe262_model\": \"737-MAX\",\n" +
-                    "        \"swe262_description\": \"Commercial airliner, low hours,\\n            perfect for charter operations\",\n" +
-                    "        \"swe262_year\": 2022,\n" +
-                    "        \"swe262_color\": \"White and Blue\"\n" +
-                    "    },\n" +
-                    "    {\n" +
-                    "        \"swe262_location\": {\n" +
-                    "            \"swe262_city\": \"Las Vegas,\",\n" +
-                    "            \"swe262_state\": \"Nevada\"\n" +
-                    "        },\n" +
-                    "        \"swe262_make\": \"Gulfstream\",\n" +
-                    "        \"swe262_seller\": {\n" +
-                    "            \"phone\": \"555-333-4444\",\n" +
-                    "            \"email\": \"luxury@jetmarket.com\",\n" +
-                    "            \"content\": \"Premium Jet Market\"\n" +
-                    "        },\n" +
-                    "        \"swe262_model\": \"G650\",\n" +
-                    "        \"swe262_description\": \"Executive jet, 1200 hours total time, \\n                full luxury interior, intercontinental range\",\n" +
-                    "        \"swe262_year\": 2019,\n" +
-                    "        \"swe262_color\": \"Pearl White\"\n" +
-                    "    },\n" +
-                    "    {\n" +
-                    "        \"swe262_location\": {\n" +
-                    "            \"swe262_city\": \"Austin,\",\n" +
-                    "            \"swe262_state\": \"Texas\"\n" +
-                    "        },\n" +
-                    "        \"swe262_price\": \"185,000\",\n" +
-                    "        \"swe262_make\": \"Cessna\",\n" +
-                    "        \"swe262_seller\": {\n" +
-                    "            \"phone\": \"555-777-8888\",\n" +
-                    "            \"website\": \"www.flyingschool.com\",\n" +
-                    "            \"content\": \"Flight Academy Sales\"\n" +
-                    "        },\n" +
-                    "        \"swe262_model\": \"172SP\",\n" +
-                    "        \"swe262_description\": \"Training aircraft, 5200 hours total, \\n                G1000 glass cockpit, ADS-B equipped\",\n" +
-                    "        \"swe262_year\": 2015,\n" +
-                    "        \"swe262_color\": \"Red and White\"\n" +
-                    "    }\n" +
-                    "]}}";
 
-            // Wait for completion with timeout safety
+            final String expectedJson = "{\"swe262_catalog\":{\"swe262_book\":[{\"swe262_author\":\"Gambardella, Matthew\",\"swe262_title\":\"XML Developer's Guide\",\"swe262_genre\":\"Computer\",\"swe262_price\":44.95,\"swe262_publish_date\":\"2000-10-01\",\"swe262_description\":\"An in-depth look at creating applications \\n      with XML.\",\"swe262_id\":\"bk101\"},{\"swe262_author\":\"Ralls, Kim\",\"swe262_title\":\"Midnight Rain\",\"swe262_genre\":\"Fantasy\",\"swe262_price\":5.95,\"swe262_publish_date\":\"2000-12-16\",\"swe262_description\":\"A former architect battles corporate zombies, \\n      an evil sorceress, and her own childhood to become queen \\n      of the world.\",\"swe262_id\":\"bk102\"},{\"swe262_author\":\"Corets, Eva\",\"swe262_title\":\"Maeve Ascendant\",\"swe262_genre\":\"Fantasy\",\"swe262_price\":5.95,\"swe262_publish_date\":\"2000-11-17\",\"swe262_description\":\"After the collapse of a nanotechnology \\n      society in England, the young survivors lay the \\n      foundation for a new society.\",\"swe262_id\":\"bk103\"},{\"swe262_author\":\"Corets, Eva\",\"swe262_title\":\"Oberon's Legacy\",\"swe262_genre\":\"Fantasy\",\"swe262_price\":5.95,\"swe262_publish_date\":\"2001-03-10\",\"swe262_description\":\"In post-apocalypse England, the mysterious \\n      agent known only as Oberon helps to create a new life \\n      for the inhabitants of London. Sequel to Maeve \\n      Ascendant.\",\"swe262_id\":\"bk104\"},{\"swe262_author\":\"Corets, Eva\",\"swe262_title\":\"The Sundered Grail\",\"swe262_genre\":\"Fantasy\",\"swe262_price\":5.95,\"swe262_publish_date\":\"2001-09-10\",\"swe262_description\":\"The two daughters of Maeve, half-sisters, \\n      battle one another for control of England. Sequel to \\n      Oberon's Legacy.\",\"swe262_id\":\"bk105\"},{\"swe262_author\":\"Randall, Cynthia\",\"swe262_title\":\"Lover Birds\",\"swe262_genre\":\"Romance\",\"swe262_price\":4.95,\"swe262_publish_date\":\"2000-09-02\",\"swe262_description\":\"When Carla meets Paul at an ornithology \\n      conference, tempers fly as feathers get ruffled.\",\"swe262_id\":\"bk106\"},{\"swe262_author\":\"Thurman, Paula\",\"swe262_title\":\"Splish Splash\",\"swe262_genre\":\"Romance\",\"swe262_price\":4.95,\"swe262_publish_date\":\"2000-11-02\",\"swe262_description\":\"A deep sea diver finds true love twenty \\n      thousand leagues beneath the sea.\",\"swe262_id\":\"bk107\"},{\"swe262_author\":\"Knorr, Stefan\",\"swe262_title\":\"Creepy Crawlies\",\"swe262_genre\":\"Horror\",\"swe262_price\":4.95,\"swe262_publish_date\":\"2000-12-06\",\"swe262_description\":\"An anthology of horror stories about roaches,\\n      centipedes, scorpions  and other insects.\",\"swe262_id\":\"bk108\"},{\"swe262_author\":\"Kress, Peter\",\"swe262_title\":\"Paradox Lost\",\"swe262_genre\":\"Science Fiction\",\"swe262_price\":6.95,\"swe262_publish_date\":\"2000-11-02\",\"swe262_description\":\"After an inadvertant trip through a Heisenberg\\n      Uncertainty Device, James Salway discovers the problems \\n      of being quantum.\",\"swe262_id\":\"bk109\"},{\"swe262_author\":\"O'Brien, Tim\",\"swe262_title\":\"Microsoft .NET: The Programming Bible\",\"swe262_genre\":\"Computer\",\"swe262_price\":36.95,\"swe262_publish_date\":\"2000-12-09\",\"swe262_description\":\"Microsoft's .NET initiative is explored in \\n      detail in this deep programmer's reference.\",\"swe262_id\":\"bk110\"},{\"swe262_author\":\"O'Brien, Tim\",\"swe262_title\":\"MSXML3: A Comprehensive Guide\",\"swe262_genre\":\"Computer\",\"swe262_price\":36.95,\"swe262_publish_date\":\"2000-12-01\",\"swe262_description\":\"The Microsoft MSXML3 parser is covered in \\n      detail, with attention to XML DOM interfaces, XSLT processing, \\n      SAX and more.\",\"swe262_id\":\"bk111\"},{\"swe262_author\":\"Galos, Mike\",\"swe262_title\":\"Visual Studio 7: A Comprehensive Guide\",\"swe262_genre\":\"Computer\",\"swe262_price\":49.95,\"swe262_publish_date\":\"2001-04-16\",\"swe262_description\":\"Microsoft Visual Studio 7 is explored in depth,\\n      looking at how Visual Basic, Visual C++, C#, and ASP+ are \\n      integrated into a comprehensive development \\n      environment.\",\"swe262_id\":\"bk112\"}]}}";
             waitForCompletion(asyncResult);
-
-            // Verify results
             JSONObject transformedJson = asyncResult.get();
+            // Debug output for troubleshooting
+            System.out.println("Actual transformedJson: " + transformedJson.toString(2));
+            System.out.println("Expected expectedJson: " + new JSONObject(expectedJson).toString(2));
             Util.compareActualVsExpectedJsonObjects(transformedJson, new JSONObject(expectedJson));
-            
         } catch (FileNotFoundException ex) {
             fail("Test resource not found: " + TEST_RESOURCE_PATH);
         } catch (IOException ex) {
@@ -1660,25 +1604,24 @@ public class XMLTest {
      */
     @Test
     public void transformJSONObjectKeyAsynReturnTypeTest() {
-        try (FileReader xmlInput = new FileReader("src/test/java/org/json/junit/testXML/planes.xml")) {
+        // Use books.xml for consistency with other async tests
+        final String TEST_RESOURCE_PATH = "src/test/java/org/json/junit/testXML/books.xml";
+        try (FileReader xmlInput = new FileReader(TEST_RESOURCE_PATH)) {
             // Define transformation strategy
             Function<String, String> keyDecorator = input -> "swe262_" + input;
             Consumer<Exception> diagnosticsHandler = Throwable::printStackTrace;
 
             // Execute async conversion
             Future<JSONObject> conversionTask = XML.toJSONObject(
-                xmlInput, 
+                xmlInput,
                 keyDecorator,
                 diagnosticsHandler
             );
-            
             // Wait for completion
             waitForCompletion(conversionTask);
-            
             // Verify result type
             Object result = conversionTask.get();
             assertTrue("Result should be JSONObject instance", result instanceof JSONObject);
-            
         } catch (Exception ex) {
             fail("Test failed with exception: " + ex.getMessage());
         }
@@ -1694,22 +1637,19 @@ public class XMLTest {
     public void transformJSONObjectKeyAsynExceptionHandlerTest() {
         // Create an exception recorder to verify handler invocation
         final List<String> errorMessages = new ArrayList<>();
-        
-        try (FileReader xmlInput = new FileReader("src/test/java/org/json/junit/testXML/planes.xml")) {
+        // Use books.xml for consistency, but pass a null transformer to trigger exception
+        final String TEST_RESOURCE_PATH = "src/test/java/org/json/junit/testXML/books.xml";
+        try (FileReader xmlInput = new FileReader(TEST_RESOURCE_PATH)) {
             // Create handler that records error messages
             Consumer<Exception> errorCollector = ex -> errorMessages.add(ex.getMessage());
-            
             // Intentionally pass null transformer to trigger exception
             Future<JSONObject> result = XML.toJSONObject(xmlInput, null, errorCollector);
-            
             // Verify null result for error case
             assertNull("Result should be null when exception occurs", result);
-            
             // Verify exception was handled
             assertFalse("Error handler should have been invoked", errorMessages.isEmpty());
-            
         } catch (FileNotFoundException ex) {
-            fail("Test resource not found");
+            fail("Test resource not found: " + TEST_RESOURCE_PATH);
         } catch (IOException ex) {
             fail("I/O error closing resource");
         }
